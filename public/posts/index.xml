@@ -10,18 +10,11 @@
     <lastBuildDate>Fri, 16 Feb 2024 18:30:00 +0000</lastBuildDate>
     <atom:link href="https://www.atharvapandey.com/posts/index.xml" rel="self" type="application/rss+xml" />
     <item>
-      <title>Hello 2</title>
-      <link>https://www.atharvapandey.com/posts/hello-2/</link>
+      <title>Rust in Finance: Building a Scalable High-Frequency Trading Platform from Scratch</title>
+      <link>https://www.atharvapandey.com/posts/rust-in-finance-building-a-scalable-high-frequency-trading-platform-from-scratch/</link>
       <pubDate>Fri, 16 Feb 2024 18:30:00 +0000</pubDate>
-      <guid>https://www.atharvapandey.com/posts/hello-2/</guid>
-      <description>what a summary</description>
-    </item>
-    <item>
-      <title>Hello, World!</title>
-      <link>https://www.atharvapandey.com/posts/hello-world/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      <guid>https://www.atharvapandey.com/posts/hello-world/</guid>
-      <description>Hello World! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut non lorem diam. Quisque vulputate nibh sodales eros pretium tincidunt. Aenean porttitor efficitur convallis. Nulla sagittis finibus convallis. Phasellus in fermentum quam, eu egestas tortor. Maecenas ac mollis leo. Integer maximus eu nisl vel sagittis.&#xA;Suspendisse facilisis, mi ac scelerisque interdum, ligula ex imperdiet felis, a posuere eros justo nec sem. Nullam laoreet accumsan metus, sit amet tincidunt orci egestas nec.</description>
+      <guid>https://www.atharvapandey.com/posts/rust-in-finance-building-a-scalable-high-frequency-trading-platform-from-scratch/</guid>
+      <description>software architecture — a high-frequency trading (HFT) platform. In the high-stakes world of high-frequency trading (HFT), where milliseconds can mean millions, the quest for the ultimate trading platform is relentless. With its relentless demand for speed, low latency and reliability, served as the perfect proving ground for my exploration into Rust’s capabilities and the architectural paradigms that would best harness them.</description>
     </item>
   </channel>
 </rss>
