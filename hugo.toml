@@ -1,4 +1,5 @@
-baseURL = 'https://example.org/'
+baseURL = 'https://atharvapandey.com/'
 languageCode = 'en-us'
-title = 'My New Hugo Site'
+title = 'Atharva'
 theme = 'github-style'
+copyright = "Copyright © 2024 Atharva Pandey"
