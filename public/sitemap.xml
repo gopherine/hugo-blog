@@ -2,12 +2,21 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://atharvapandey.com/readme/</loc>
+    <loc>https://www.atharvapandey.com/</loc>
+    <lastmod>2024-02-16T18:30:00+00:00</lastmod>
   </url><url>
-    <loc>https://atharvapandey.com/</loc>
+    <loc>https://www.atharvapandey.com/posts/hello-2/</loc>
+    <lastmod>2024-02-16T18:30:00+00:00</lastmod>
   </url><url>
-    <loc>https://atharvapandey.com/categories/</loc>
+    <loc>https://www.atharvapandey.com/posts/</loc>
+    <lastmod>2024-02-16T18:30:00+00:00</lastmod>
   </url><url>
-    <loc>https://atharvapandey.com/tags/</loc>
+    <loc>https://www.atharvapandey.com/readme/</loc>
+  </url><url>
+    <loc>https://www.atharvapandey.com/categories/</loc>
+  </url><url>
+    <loc>https://www.atharvapandey.com/posts/hello-world/</loc>
+  </url><url>
+    <loc>https://www.atharvapandey.com/tags/</loc>
   </url>
 </urlset>

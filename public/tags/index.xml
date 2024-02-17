@@ -2,11 +2,11 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Tags on Atharva</title>
-    <link>https://atharvapandey.com/tags/</link>
+    <link>https://www.atharvapandey.com/tags/</link>
     <description>Recent content in Tags on Atharva</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>Copyright © 2024 Atharva Pandey</copyright>
-    <atom:link href="https://atharvapandey.com/tags/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://www.atharvapandey.com/tags/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>

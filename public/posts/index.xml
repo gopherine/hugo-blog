@@ -1,27 +1,20 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Atharva</title>
-    <link>https://www.atharvapandey.com/</link>
-    <description>Recent content on Atharva</description>
+    <title>Posts on Atharva</title>
+    <link>https://www.atharvapandey.com/posts/</link>
+    <description>Recent content in Posts on Atharva</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>Copyright © 2024 Atharva Pandey</copyright>
     <lastBuildDate>Fri, 16 Feb 2024 18:30:00 +0000</lastBuildDate>
-    <atom:link href="https://www.atharvapandey.com/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://www.atharvapandey.com/posts/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Hello 2</title>
       <link>https://www.atharvapandey.com/posts/hello-2/</link>
       <pubDate>Fri, 16 Feb 2024 18:30:00 +0000</pubDate>
       <guid>https://www.atharvapandey.com/posts/hello-2/</guid>
       <description>what a summary</description>
-    </item>
-    <item>
-      <title></title>
-      <link>https://www.atharvapandey.com/readme/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      <guid>https://www.atharvapandey.com/readme/</guid>
-      <description>Hello, I&amp;rsquo;m Atharva Pandey! 👋 I&amp;rsquo;m a dynamic and innovative technology leader with a passion for blockchain and backend development. With extensive experience leading teams and projects in diverse, remote settings, I&amp;rsquo;ve delivered cutting-edge solutions in the blockchain domain, utilizing my expertise as a Generalist and Ployglot.&#xA;🚀 About Me As the CTO of Adguin, I led the development of an NFT-based ad tech platform, architecting scalable solutions from the ground up.</description>
     </item>
     <item>
       <title>Hello, World!</title>
