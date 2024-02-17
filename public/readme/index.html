@@ -234,7 +234,7 @@
     repo: 'hugo-blog',
     owner: 'gopherine',
     admin: ['gopherine'],
-    id: eval("location.pathname | mdhash | slice 0 50"), 
+    id: eval("location.pathname.slice(0, 50)"), 
     distractionFreeMode: false 
   });
   (function() {
