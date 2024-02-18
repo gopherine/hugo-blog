@@ -174,23 +174,35 @@ function monthly(year, month, posts) {
   </div>`;
 }
 
+function switchYearHandler(year) {
+  return function(event) {
+      event.preventDefault(); // Prevent the default action of the link
+      switchYear(year); // Call the switchYear function with the year parameter
+  };
+}
+
 function yearList() {
   const years = [];
   for (const item of contributions) {
-    const year = item.date.getFullYear();
-    if (!years.includes(year)) {
-      years.push(year);
-    }
+      const year = item.date.getFullYear();
+      if (!years.includes(year)) {
+          years.push(year);
+      }
   }
-  years.sort((a, b) => {
-    return b - a;
-  });
+  years.sort((a, b) => { return b - a });
 
-  for (let i = 0; i < years.length; i++) {
-    const year = years[i];
-    const node = document.createElement("li");
-    node.innerHTML = `<li><a class="js-year-link filter-item px-3 mb-2 py-2" onclick="switchYear('${year}')">${year}</a></li>`;
-    document.querySelector("#year-list").appendChild(node);
+  const yearListContainer = document.querySelector('#year-list');
+  yearListContainer.innerHTML = ''; // Clear previous content
+
+  for (const year of years) {
+      const listItem = document.createElement('li');
+      const link = document.createElement('a');
+      link.classList.add("js-year-link", "filter-item", "px-3", "mb-2", "py-2");
+      link.href = '#'; // Set href attribute to '#' to make it a valid link
+      link.textContent = year;
+      link.addEventListener('click', switchYearHandler(year)); // Add event listener
+      listItem.appendChild(link);
+      yearListContainer.appendChild(listItem);
   }
 }
 
