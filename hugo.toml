@@ -1,14 +1,61 @@
-baseURL = 'https://www.atharvapandey.com/'
-languageCode = 'en-us'
-title = 'Atharva'
-theme = 'github-style'
-copyright = "Copyright © 2024 Atharva Pandey"
-enableRobotsTXT = true
+baseURL='https://atharvapandey.com/'
+languageCode='en-us'
+title='Atharva Pandey'
+theme="github-style"
+copyright="Copyright ©"
+
+[module]
+[[module.mounts]]
+source="assets"
+target="assets"
+[[module.mounts]]
+source="hugo_stats.json"
+target="assets/watching/hugo_stats.json"
+
+[build]
+writeStats=true
+[[build.cachebusters]]
+source="assets/watching/hugo_stats\\.json"
+target="styles\\.css"
+[[build.cachebusters]]
+source="(postcss|tailwind)\\.config\\.js"
+target="css"
+[[build.cachebusters]]
+source="assets/.*\\.(js|ts|jsx|tsx)"
+target="js"
+[[build.cachebusters]]
+source="assets/.*\\.(.*)$"
+target="$1"
 
 [minify]
-disableCSS = false
-disableHTML = false
-disableSVG = false
-disableJSON = false
-disableXML = false
-disableJS = false
+disableCSS=false
+disableHTML=false
+disableJS=false
+disableJSON=false
+disableSVG=false
+disableXML=false
+minifyOutput=false
+[minify.tdewolff]
+[minify.tdewolff.css]
+keepCSS2=true
+precision=0
+[minify.tdewolff.html]
+keepComments=false
+keepConditionalComments=false
+keepDefaultAttrVals=true
+keepDocumentTags=true
+keepEndTags=true
+keepQuotes=false
+keepWhitespace=false
+[minify.tdewolff.js]
+keepVarNames=false
+precision=0
+version=2022
+[minify.tdewolff.json]
+keepNumbers=false
+precision=0
+[minify.tdewolff.svg]
+keepComments=false
+precision=0
+[minify.tdewolff.xml]
+keepWhitespace=false

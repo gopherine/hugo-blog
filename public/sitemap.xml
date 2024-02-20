@@ -2,19 +2,22 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://www.atharvapandey.com/</loc>
+    <loc>https://atharvapandey.com/</loc>
+    <lastmod>2024-02-20T18:30:00+00:00</lastmod>
+  </url><url>
+    <loc>https://atharvapandey.com/post/</loc>
+    <lastmod>2024-02-20T18:30:00+00:00</lastmod>
+  </url><url>
+    <loc>https://atharvapandey.com/post/rust-ultimate-the-ultimate-rust-cheatsheet-youll-ever-need/</loc>
+    <lastmod>2024-02-20T18:30:00+00:00</lastmod>
+  </url><url>
+    <loc>https://atharvapandey.com/post/rust-in-finance-building-a-scalable-high-frequency-trading-platform-from-scratch.md/</loc>
     <lastmod>2024-02-16T18:30:00+00:00</lastmod>
   </url><url>
-    <loc>https://www.atharvapandey.com/posts/</loc>
-    <lastmod>2024-02-16T18:30:00+00:00</lastmod>
+    <loc>https://atharvapandey.com/readme/</loc>
   </url><url>
-    <loc>https://www.atharvapandey.com/posts/rust-in-finance-building-a-scalable-high-frequency-trading-platform-from-scratch/</loc>
-    <lastmod>2024-02-16T18:30:00+00:00</lastmod>
+    <loc>https://atharvapandey.com/categories/</loc>
   </url><url>
-    <loc>https://www.atharvapandey.com/readme/</loc>
-  </url><url>
-    <loc>https://www.atharvapandey.com/categories/</loc>
-  </url><url>
-    <loc>https://www.atharvapandey.com/tags/</loc>
+    <loc>https://atharvapandey.com/tags/</loc>
   </url>
 </urlset>
