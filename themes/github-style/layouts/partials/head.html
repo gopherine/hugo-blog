@@ -1,0 +1,23 @@
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preload" href='{{ "css/frameworks.min.css" | absURL }}' as="style">
+    <link rel="stylesheet" href='{{ "css/frameworks.min.css" | absURL }}' media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href='{{ "css/frameworks.min.css" | absURL }}'></noscript>
+    <link rel="stylesheet" href='{{ "css/github.min.css" | absURL }}' />
+    <link rel="stylesheet" href='{{ "css/github-style.css" | absURL }}' />
+    <link rel="stylesheet" href='{{ "css/light.css" | absURL }}' />
+    <link rel="stylesheet" href='{{ "css/dark.css" | absURL }}' />
+    <link rel="stylesheet" href='{{ "css/syntax.css" | absURL }}' />
+    <title>{{ if .IsHome }}{{ else }}{{ .Title }} - {{ end }}{{ .Site.Title }}</title>
+    {{ if .Site.Params.favicon }}
+    <link rel="icon" type="image/x-icon" href='{{ .Site.Params.favicon  }}'>
+    {{ else }}
+    <link rel="icon" type="image/x-icon" href='{{ "images/favicon.ico" | absURL }}'>
+    {{ end }}
+    <meta name="theme-color" content="#1e2327">
+    <script defer src='{{ "js/theme-mode.js" | absURL }}'></script>
+
+    <!-- Extended head section-->
+    {{ partial "extended_head.html" . }}
+</head>

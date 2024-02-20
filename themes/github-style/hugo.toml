@@ -1,0 +1,27 @@
+baseURL="https://atharvapandey.com/"
+languageCode="en-us"
+title="Atharva's blog"
+theme="github-style"
+googleAnalytics="UA-123456-789"
+pygmentsCodeFences=true
+pygmentsUseClasses=true
+
+[params]
+author="Atharva Pandey"
+description="I code, build, architect and drink coffee, decaf is BS."
+github="Gopherine"
+twitter="vedaatharva"
+linkedin="atharvapandey"
+email="atharvajava@gmail.com"
+url="https://atharvapandey.com"
+keywords="blog, google analytics, rust, golang, javascript, react, typescript, software architecture"
+rss=true
+lastmod=true
+favicon="/images/nerd-crab.ico"
+avatar="/images/avatar.png"
+headerIcon="/images/nerdy-crab-light.webp"
+location="India"
+userStatusEmoji="☕"
+
+[frontmatter]
+lastmod=["lastmod", ":fileModTime", ":default"]
