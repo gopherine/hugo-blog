@@ -10,7 +10,7 @@
     </a>
     <ul class="flex-wrap mb-2 list-style-none d-flex col-12 flex-justify-center flex-lg-justify-between mb-lg-0">
       {{ if .Site.Copyright }}
-      <li class="mr-3 mr-lg-0">{{ .Site.Copyright | safeHTML }} {{ now.Year }} {{ .Site.Params.author }}</li>
+      <li class="mr-3 mr-lg-0">{{ .Site.Copyright | safeHTML }} {{ now.Year }} {{ .Site.Params.author }} {{ .Site.Params.Giscus.repo}}</li>
       {{ else }}
       <li class="mr-3 mr-lg-0">Theme by <a href='https://github.com/MeiK2333/github-style'>github-style</a></li>
       {{ end }}

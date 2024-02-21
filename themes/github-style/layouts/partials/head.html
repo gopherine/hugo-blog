@@ -9,6 +9,8 @@
     <link rel="stylesheet" href='{{ "css/light.css" | absURL }}' />
     <link rel="stylesheet" href='{{ "css/dark.css" | absURL }}' />
     <link rel="stylesheet" href='{{ "css/syntax.css" | absURL }}' />
+    <link rel="stylesheet" href="https://unpkg.com/applause-button/dist/applause-button.css" />
+    <script defer src="https://unpkg.com/applause-button/dist/applause-button.js"></script>
     <title>{{ if .IsHome }}{{ else }}{{ .Title }} - {{ end }}{{ .Site.Title }}</title>
     {{ if .Site.Params.favicon }}
     <link rel="icon" type="image/x-icon" href='{{ .Site.Params.favicon  }}'>

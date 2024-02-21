@@ -1,0 +1,23 @@
+{{- if isset .Site.Params "giscus" -}}
+  {{- if and (isset .Site.Params.giscus "repo") (not (eq .Site.Params.giscus.repo "" )) (eq (.Params.disable_comments | default false) false) -}}
+  <div class="px-3 container-lg new-discussion-timeline">
+<script src="https://giscus.app/client.js"
+data-repo="{{ .Site.Params.Giscus.repo}}"
+data-repo-id="{{ .Site.Params.Giscus.repoId}}"
+data-category="{{ .Site.Params.Giscus.category}}"
+data-category-id="{{ .Site.Params.Giscus.categoryId}}"
+data-mapping="{{ .Site.Params.Giscus.mapping}}"
+data-strict="{{ .Site.Params.Giscus.strict}}"
+data-reactions-enabled="{{ .Site.Params.Giscus.reactionsEnabled}}"
+data-emit-metadata="{{ .Site.Params.Giscus.emitMetadata}}"
+data-input-position="{{ .Site.Params.Giscus.inputPosition}}"
+data-theme="{{ .Site.Params.Giscus.theme}}"
+data-lang="{{ .Site.Params.Giscus.lang}}"
+data-loading="{{ .Site.Params.Giscus.loading}}"
+crossorigin="{{ .Site.Params.Giscus.crossorigin}}"
+        async>
+</script>
+</div>
+<applause-button style="width: 58px; height: 58px; position: fixed; bottom: 20px; left: 20px;"/>
+{{- end -}}
+{{- end -}}

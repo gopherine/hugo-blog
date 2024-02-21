@@ -23,5 +23,20 @@ headerIcon="/images/nerdy-crab-light.webp"
 location="India"
 userStatusEmoji="☕"
 
+[params.giscus]
+repo="gopherine/hugo-blog"
+repoId="R_kgDOLTrS1w"
+category="Announcements"
+category-id="DIC_kwDOLTrS184CdYrP"
+mapping="title"
+strict="0"
+reactions-enabled="1"
+emitMetadata="0"
+inputPosition="bottom"
+theme="preferred_color_scheme"
+lang="en"
+loading="lazy"
+crossorigin="anonymous"
+
 [frontmatter]
 lastmod=["lastmod", ":fileModTime", ":default"]

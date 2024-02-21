@@ -2,6 +2,7 @@
   "htmlElements": {
     "tags": [
       "a",
+      "applause-button",
       "article",
       "body",
       "br",
