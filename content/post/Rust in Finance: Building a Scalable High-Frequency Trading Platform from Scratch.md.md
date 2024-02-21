@@ -2,7 +2,6 @@
 title: >-
   Rust in Finance: Building a Scalable High-Frequency Trading Platform from
   Scratch
-date: 2024-02-16T18:30:00.000Z
 author: Atharva Pandey
 keywords:
   - clean
@@ -10,9 +9,10 @@ keywords:
   - prgramming
   - high frequency trading
   - rust
+date: 2024-02-16T18:30:00.000Z
 ---
 
-![](/admin/crab-transformed.webp)
+![](/images/crab-transformed.webp)
 
 As I ventured deeper into the Rust ecosystem, I set my sights on a project that would not only challenge my technical acumen but also push the boundaries of software architecture — a high-frequency trading (HFT) platform. In the high-stakes world of high-frequency trading (HFT), where milliseconds can mean millions, the quest for the ultimate trading platform is relentless. With its relentless demand for speed, low latency and reliability, served as the perfect proving ground for my exploration into Rust’s capabilities and the architectural paradigms that would best harness them.
 
@@ -116,4 +116,4 @@ Potential Solutions:
 
 # Conclusion
 
-The journey to architecting an HFT platform in Rust has been a profound exploration of balancing the cutting-edge performance of Rust with architectural patterns that prioritize adaptability and scalability. This project has not only honed my skills in Rust but has also illuminated the path to designing systems that are built to evolve, adapt, and scale in the face of the ever-changing technological and financial landscapes. Through this endeavor, the architecture that emerged stands as a testament to the synergy between modern software principles and the unparalleled capabilities of Rust, setting a new benchmark for building high-performance, adaptable systems in the world of finance.
+The journey to architecting an HFT platform in Rust has been a profound exploration of balancing the cutting-edge performance of Rust with architectural patterns that prioritize adaptability and scalability. This project has not only honed my skills in Rust but has also illuminated the path to designing systems that are built to evolve, adapt, and scale in the face of the ever-changing technological and financial landscapes. Through this endeavor, the architecture that emerged stands as a testament to the synergy between modern software principles and the unparalleled capabilities of Rust, setting a new benchmark for building high-performance, adaptable systems in the world of finance.![](/images/crab-transformed.webp)
