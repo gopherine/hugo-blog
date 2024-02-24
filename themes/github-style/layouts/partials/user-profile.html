@@ -10,7 +10,7 @@
               {{ with $.Site.Params.avatar }}
                 <img class="rounded-1 avatar-user" height="32" width="32" src="{{ $.Site.Params.avatar }}" alt="User avatar">
               {{ else }}
-                <img class="rounded-1 avatar-user" height="32" width="32" src="{{ "images/avatar.png" | absURL }}" alt="Default avatar">
+                <img class="rounded-1 avatar-user" height="32" width="32" src="{{ "images/avatar.webp" | absURL }}" alt="Default avatar">
               {{ end }}
             </span>
             <span class="d-table-cell v-align-middle lh-condensed">
@@ -26,8 +26,8 @@
               <img alt="User avatar" class="bg-white border avatar avatar-user width-full" src="{{ $.Site.Params.avatar }}" style="width:260px; height:auto;">
             </a>
           {{ else }}
-            <a href="{{ "images/avatar.png" | absURL }}" aria-label="Default Avatar">
-              <img alt="Default avatar" class="bg-white border avatar avatar-user width-full" src="{{ "images/avatar.png" | absURL }}" style="width:260px; height:auto;">
+            <a href="{{ "images/avatar.webp" | absURL }}" aria-label="Default Avatar">
+              <img alt="Default avatar" class="bg-white border avatar avatar-user width-full" src="{{ "images/avatar.webp" | absURL }}" style="width:260px; height:auto;">
             </a>
           {{ end }}
             {{ with $.Site.Params.userStatusEmoji }}
@@ -117,37 +117,37 @@
 
           {{ if .Site.Params.twitter}}
           <a style="margin: 0 10px 10px 0;" href="https://twitter.com/{{ .Site.Params.twitter }}">
-            <img alt="@twitter" width="32" height="32" src="{{ "images/twitter.png" | absURL }}" class="avatar">
+            <img alt="@twitter" width="32" height="32" src="{{ "images/twitter.webp" | absURL }}" class="avatar">
           </a>
           {{ end }}
 
           {{ if .Site.Params.facebook}}
           <a style="margin: 0 10px 10px 0;" href="https://facebook.com/{{ .Site.Params.facebook }}">
-            <img alt="@facebook" width="32" height="32" src="{{ "images/facebook.png" | absURL }}" class="avatar">
+            <img alt="@facebook" width="32" height="32" src="{{ "images/facebook.webp" | absURL }}" class="avatar">
           </a>
           {{ end }}
 
           {{ if .Site.Params.linkedin }}
           <a style="margin: 0 10px 10px 0;" href="https://linkedin.com/in/{{ .Site.Params.linkedin }}">
-            <img alt="@linkedin" width="32" height="32" src="{{ "images/linkedin.png" | absURL }}" class="avatar">
+            <img alt="@linkedin" width="32" height="32" src="{{ "images/linkedin.webp" | absURL }}" class="avatar">
           </a>
           {{ end }}
 
           {{ if .Site.Params.instagram }}
           <a style="margin: 0 10px 10px 0;" href="https://instagram.com/{{ .Site.Params.instagram }}">
-            <img alt="@instagram" width="32" height="32" src="{{ "images/instagram.png" | absURL }}" class="avatar">
+            <img alt="@instagram" width="32" height="32" src="{{ "images/instagram.webp" | absURL }}" class="avatar">
           </a>
           {{ end }}
 
           {{ if .Site.Params.tumblr }}
           <a style="margin: 0 10px 10px 0;" href="https://{{ .Site.Params.tumblr }}.tumblr.com/">
-            <img alt="@tumblr" width="32" height="32" src="{{ "images/tumblr.png" | absURL }}" class="avatar">
+            <img alt="@tumblr" width="32" height="32" src="{{ "images/tumblr.webp" | absURL }}" class="avatar">
           </a>
           {{ end }}
 
           {{ if .Site.Params.stackoverflow }}
           <a style="margin: 0 10px 10px 0;" href="https://stackoverflow.com/u/{{ .Site.Params.stackoverflow }}">
-            <img alt="@stackoverflow" width="32" height="32" src="{{ "images/stackoverflow.png" | absURL }}" class="avatar">
+            <img alt="@stackoverflow" width="32" height="32" src="{{ "images/stackoverflow.webp" | absURL }}" class="avatar">
           </a>
           {{ end }}
 
@@ -159,7 +159,7 @@
           </a>
           {{ else }}
           <a style="margin: 0 10px 10px 0;" href="{{ .href }}">
-            <img alt="@{{ .title }}" width="32" height="32" src='{{ "images/link.png" | absURL }}' class="avatar">
+            <img alt="@{{ .title }}" width="32" height="32" src='{{ "images/link.webp" | absURL }}' class="avatar">
           </a>
           {{ end }}
           {{ end }}
@@ -167,7 +167,7 @@
 
           {{ if .Site.Params.rss }}
           <a style="margin: 0 10px 10px 0;" href="{{ "index.xml" | absURL }}">
-            <img alt="@rss" width="32" height="32" src="{{ "images/rss.png" | absURL }}" class="avatar">
+            <img alt="@rss" width="32" height="32" src="{{ "images/rss.webp" | absURL }}" class="avatar">
           </a>
           {{ end }}
          </div>

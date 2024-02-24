@@ -34,7 +34,7 @@ disableJS=false
 disableJSON=false
 disableSVG=false
 disableXML=false
-minifyOutput=false
+minifyOutput=true
 [minify.tdewolff]
 [minify.tdewolff.css]
 keepCSS2=true
@@ -59,3 +59,15 @@ keepComments=false
 precision=0
 [minify.tdewolff.xml]
 keepWhitespace=false
+
+
+[[deployment.matchers]]
+# Cache static assets for 1 year.
+pattern = "^.+\\.(js|css|svg|ttf|woff2)$"
+cacheControl = "max-age=31536000, no-transform, public"
+gzip = true
+
+[[deployment.matchers]]
+pattern = "^.+\\.(png|jpg|gif|webp)$"
+cacheControl = "max-age=31536000, no-transform, public"
+gzip = true

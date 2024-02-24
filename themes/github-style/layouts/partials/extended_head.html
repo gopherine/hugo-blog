@@ -37,8 +37,8 @@
 <!-- Google Analytics -->
 {{ if eq (getenv "HUGO_ENV") "production"}}
 {{ if .Site.GoogleAnalytics }}
-<script async src="https://www.googletagmanager.com/gtag/js?id={{ .Site.GoogleAnalytics }}"></script>
-<script>
+<script defer async src="https://www.googletagmanager.com/gtag/js?id={{ .Site.GoogleAnalytics }}"></script>
+<script defer>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
