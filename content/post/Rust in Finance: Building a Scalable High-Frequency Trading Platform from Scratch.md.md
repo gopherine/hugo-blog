@@ -4,11 +4,30 @@ title: >-
   Scratch
 author: Atharva Pandey
 keywords:
-  - clean
   - software architecture
   - prgramming
   - high frequency trading
   - rust
+  - Rust programming in finance
+  - High-frequency trading with Rust
+  - Building HFT platforms
+  - Scalable trading systems in Rust
+  - Rust for financial applications
+  - Low-latency trading Rust
+  - Rust blockchain projects in finance
+  - Backend development for trading platforms
+  - Rust in quantitative finance
+  - Efficient financial software with Rust
+  - Rust and smart contract development
+  - Decentralized finance with Rust
+  - Performance optimization in trading platforms
+  - Rust for algorithmic trading
+  - Secure financial applications Rust
+  - Rust concurrency in HFT
+  - Rust software architecture for finance
+  - Advanced Rust programming techniques
+  - Real-time data processing Rust
+  - Rust for financial data analysis
 date: 2024-02-16T18:30:00.000Z
 ---
 
