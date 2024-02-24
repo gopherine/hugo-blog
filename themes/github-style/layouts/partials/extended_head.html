@@ -1,5 +1,5 @@
-<meta name="description" content="{{ if .IsHome }}{{ .Site.Params.tagline }}{{ else }}{{ .Summary | plainify }}{{ end }}" />
-<meta name="keywords" content='{{ with .Params.Keywords }}{{ delimit . ", " }}{{ else }}{{ $.Site.Params.Keywords }}{{ end }}' />
+<meta name="description" content="{{ with .Site.Params.description }}{{ . }}{{ else }}{{ .Site.Title }}{{ end }}">
+<meta name="keywords" content="{{ with .Site.Params.keywords }}{{ . }}{{ else }}Default, Keywords{{ end }}">
 <link rel="canonical" href="{{ .Permalink }}" />
 <meta name="robots" content="index, follow">
 
@@ -33,6 +33,10 @@
 {{ with .OutputFormats.Get "json" }}
 <link href="{{ .RelPermalink }}" rel="alternate" type="application/json" title="{{ $.Site.Title }}" />
 {{ end }}
+
+<!-- dns prefetch -->
+<link rel="dns-prefetch" href="https://www.googletagmanager.com">
+<link href="https://www.googletagmanager.com" rel="preconnect" crossorigin>
 
 <!-- Google Analytics -->
 {{ if eq (getenv "HUGO_ENV") "production"}}

@@ -119,9 +119,23 @@ function monthly(year, month, posts) {
 function yearList() {
   const years = [...new Set(contributions.map(({ date }) => date.getFullYear()))].sort((a, b) => b - a);
   const list = document.querySelector('#year-list');
-  list.innerHTML = years.map(year => `<li><a class="js-year-link filter-item px-3 mb-2 py-2" onclick="switchYear('${year}')">${year}</a></li>`).join('');
-}
 
+  list.innerHTML = years.map(year => {
+    // Assuming you have a route or a way to filter contributions by year in your application
+    const yearHref = `/year/${year}`; // Update this with your actual URL structure for filtering by year
+
+    return `<li><a href="${yearHref}" class="js-year-link filter-item px-3 mb-2 py-2">${year}</a></li>`;
+  }).join('');
+
+  // If you still need to use JavaScript for handling clicks, you can add event listeners here
+  document.querySelectorAll('.js-year-link').forEach(link => {
+    link.addEventListener('click', (event) => {
+      event.preventDefault(); // Prevent default link behavior
+      const year = event.target.textContent;
+      switchYear(year);
+    });
+  });
+}
 
 function graph(year, posts, startDate, endDate) {
   const postsStr = posts.length === 1 ? "post" : "posts";

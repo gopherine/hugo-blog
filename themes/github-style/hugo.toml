@@ -8,13 +8,13 @@ pygmentsUseClasses=true
 
 [params]
 author="Atharva Pandey"
-description="I code, build, architect and drink coffee, decaf is BS."
+description = "Dive into Atharva Pandey's tech blog for expert insights on software development, architecture, and cutting-edge technologies like Rust, Go, JavaScript, Blockchain, and AI. Decaf is BS, and so are half-baked tech articles."
 github="Gopherine"
 twitter="vedaatharva"
 linkedin="atharvapandey"
 email="atharvajava@gmail.com"
 url="https://atharvapandey.com"
-keywords="blog, google analytics, rust, golang, javascript, react, typescript, software architecture"
+keywords = "Atharva Pandey, tech blog, software development, programming, Rust, Go, JavaScript, React, TypeScript, software architecture, blockchain, AI, distributed systems, computer science"
 rss=true
 lastmod=true
 favicon="/images/nerd-crab.ico"
@@ -22,6 +22,13 @@ avatar="/images/avatar.webp"
 headerIcon="/images/nerdy-crab-light.webp"
 location="India"
 userStatusEmoji="☕"
+
+[tagline]
+value = "Exploring the Depths of Software Engineering and Beyond"
+
+[author]
+name = "Atharva Pandey"
+bio = "A software engineer passionate about building scalable systems, exploring new technologies, and sharing knowledge. When not coding, you'll find me sipping on a bold cup of coffee (decaf is not an option)."
 
 [params.giscus]
 repo="gopherine/hugo-blog"
