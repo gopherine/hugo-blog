@@ -149,24 +149,6 @@ impl<'a> Description for Article<'a> {
 }
 ```
 
-## Part 4: Practical Tips and Tricks
-
-### Understanding Compiler Errors
-
-Rust's compiler provides detailed error messages related to lifetimes. Learning to read these messages can significantly help in diagnosing and fixing lifetime-related issues.
-
-### Lifetime Annotations Are Not Always Required
-
-Remember, Rust's lifetime elision rules mean you won't always need to annotate lifetimes explicitly. Use them when necessary to clarify complex relationships to the compiler.
-
-### Testing and Documentation
-
-Testing functions and structures that use lifetimes is crucial. Ensure your tests cover various scenarios, especially edge cases that might challenge lifetime assumptions. Additionally, documenting how lifetimes are used in your code can greatly aid future maintenance and understanding.
-
-### Lifetimes Are a Part of Rust's Safety Guarantees
-
-Embrace lifetimes as a feature that contributes to Rust's guarantees of memory safety and concurrency safety. Understanding and using lifetimes effectively allows you to leverage the full power of Rust.\\
-
 ## Understanding Lifetimes with IRCTC
 
 In Rust, lifetimes are about ensuring that train (data) references don't outlive their journey (the scope in which they are valid). It's like making sure your train ticket is valid for your entire journey, from your departure station to your destination, without getting cancelled midway.
@@ -248,6 +230,18 @@ fn main() {
 
 This scenario demonstrates the importance of ensuring that references in a collection (like an itinerary) must remain valid for the collection's entire lifetime, akin to ensuring all train journeys in your itinerary are confirmed and not cancelled.\\
 
-### Conclusion: Rust bye message
+# Conclusion
 
-Documenting your code, especially the parts involving lifetimes, is like sharing your travel stories. It helps others follow in your footsteps more easily, ensuring they can learn from your experiences. There are fair share of concept's that are not covered in this blog, I expect you refer to rustbook to complete those missing parts, this is just my attempt to simplify lifetimes for in rust for everyone.
+Embrace lifetimes as a feature that contributes to Rust’s guarantees of memory safety and concurrency safety. Understanding and using lifetimes effectively allows you to leverage the full power of Rust.
+
+#### Understanding Compiler Errors
+
+Rust’s compiler provides detailed error messages related to lifetimes. Learning to read these messages can significantly help in diagnosing and fixing lifetime-related issues.
+
+#### Lifetime Annotations Are Not Always Required
+
+Remember, Rust’s lifetime elision rules mean you won’t always need to annotate lifetimes explicitly. Use them when necessary to clarify complex relationships to the compiler.
+
+#### Testing and Documentation
+
+Testing functions and structures that use lifetimes is crucial. Ensure your tests cover various scenarios, especially edge cases that might challenge lifetime assumptions. Additionally, documenting how lifetimes are used in your code can greatly aid future maintenance and understanding.
