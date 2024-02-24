@@ -1,27 +1,2 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>Posts on Atharva Pandey</title>
-    <link>https://atharvapandey.com/post/</link>
-    <description>Recent content in Posts on Atharva Pandey</description>
-    <generator>Hugo -- gohugo.io</generator>
-    <language>en-us</language>
-    <copyright>Copyright ©</copyright>
-    <lastBuildDate>Tue, 20 Feb 2024 18:30:00 +0000</lastBuildDate>
-    <atom:link href="https://atharvapandey.com/post/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>Rust Ultimate: The Ultimate Rust Cheatsheet You&#39;ll Ever Need</title>
-      <link>https://atharvapandey.com/post/rust-ultimate-the-ultimate-rust-cheatsheet-youll-ever-need/</link>
-      <pubDate>Tue, 20 Feb 2024 18:30:00 +0000</pubDate>
-      <guid>https://atharvapandey.com/post/rust-ultimate-the-ultimate-rust-cheatsheet-youll-ever-need/</guid>
-      <description>Whether you&amp;rsquo;re a seasoned developer juggling multiple programming languages or a newcomer to Rust, it&amp;rsquo;s not uncommon to hit a roadblock trying to recall specific syntax or optimize your code with Rust&amp;rsquo;s powerful features. This comprehensive Rust cheatsheet is designed to be your go-to reference, enabling you to harness Rust&amp;rsquo;s capabilities fully without getting slowed down by syntax uncertainties.&#xA;Vector &amp;amp; LinkedList Operations Rust&amp;rsquo;s Vec&amp;lt;T&amp;gt; and LinkedList&amp;lt;T&amp;gt; are versatile for handling collections.</description>
-    </item>
-    <item>
-      <title>Rust in Finance: Building a Scalable High-Frequency Trading Platform from Scratch</title>
-      <link>https://atharvapandey.com/post/rust-in-finance-building-a-scalable-high-frequency-trading-platform-from-scratch.md/</link>
-      <pubDate>Fri, 16 Feb 2024 18:30:00 +0000</pubDate>
-      <guid>https://atharvapandey.com/post/rust-in-finance-building-a-scalable-high-frequency-trading-platform-from-scratch.md/</guid>
-      <description>As I ventured deeper into the Rust ecosystem, I set my sights on a project that would not only challenge my technical acumen but also push the boundaries of software architecture — a high-frequency trading (HFT) platform. In the high-stakes world of high-frequency trading (HFT), where milliseconds can mean millions, the quest for the ultimate trading platform is relentless. With its relentless demand for speed, low latency and reliability, served as the perfect proving ground for my exploration into Rust’s capabilities and the architectural paradigms that would best harness them.</description>
-    </item>
-  </channel>
-</rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Posts on Atharva Pandey</title><link>https://atharvapandey.com/post/</link><description>Recent content in Posts on Atharva Pandey</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><copyright>Copyright ©</copyright><lastBuildDate>Tue, 20 Feb 2024 18:30:00 +0000</lastBuildDate><atom:link href="https://atharvapandey.com/post/index.xml" rel="self" type="application/rss+xml"/><item><title>Rust Ultimate: The Ultimate Rust Cheatsheet You'll Ever Need</title><link>https://atharvapandey.com/post/rust-ultimate-the-ultimate-rust-cheatsheet-youll-ever-need/</link><pubDate>Tue, 20 Feb 2024 18:30:00 +0000</pubDate><guid>https://atharvapandey.com/post/rust-ultimate-the-ultimate-rust-cheatsheet-youll-ever-need/</guid><description>Whether you&amp;rsquo;re a seasoned developer juggling multiple programming languages or a newcomer to Rust, it&amp;rsquo;s not uncommon to hit a roadblock trying to recall specific syntax or optimize your code with Rust&amp;rsquo;s powerful features. This comprehensive Rust cheatsheet is designed to be your go-to reference, enabling you to harness Rust&amp;rsquo;s capabilities fully without getting slowed down by syntax uncertainties.
+Vector &amp;amp; LinkedList Operations Rust&amp;rsquo;s Vec&amp;lt;T&amp;gt; and LinkedList&amp;lt;T&amp;gt; are versatile for handling collections.</description></item><item><title>Rust in Finance: Building a Scalable High-Frequency Trading Platform from Scratch</title><link>https://atharvapandey.com/post/rust-in-finance-building-a-scalable-high-frequency-trading-platform-from-scratch.md/</link><pubDate>Fri, 16 Feb 2024 18:30:00 +0000</pubDate><guid>https://atharvapandey.com/post/rust-in-finance-building-a-scalable-high-frequency-trading-platform-from-scratch.md/</guid><description>As I ventured deeper into the Rust ecosystem, I set my sights on a project that would not only challenge my technical acumen but also push the boundaries of software architecture — a high-frequency trading (HFT) platform. In the high-stakes world of high-frequency trading (HFT), where milliseconds can mean millions, the quest for the ultimate trading platform is relentless. With its relentless demand for speed, low latency and reliability, served as the perfect proving ground for my exploration into Rust’s capabilities and the architectural paradigms that would best harness them.</description></item></channel></rss>
