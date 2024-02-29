@@ -24,6 +24,9 @@ jobs:
     - name: Build
       run: hugo --minify  # Runs the Hugo build command
 
+    - name: Build TinaCMS
+      run: npx tina-build
+
     - name: Deploy to Vercel
       uses: amondnet/vercel-action@v20
       with:
