@@ -1,5 +1,5 @@
 ---
-title: "Traits: Understanding Rust Traits — The Foundation (Part\_1)"
+title: "Traits: Understanding Rust Traits  - The Foundation (Part\_1)"
 author: Atharva Pandey
 keywords:
   - ''
