@@ -4,6 +4,7 @@
   "description": "## Features",
   "main": "index.js",
   "scripts": {
+    "build": "tinacms build && hugo --minify",
     "build:css": "postcss assets/css/main.css -o static/css/style.css"
   },
   "keywords": [],
