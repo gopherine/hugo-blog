@@ -25,19 +25,20 @@ export default defineConfig({
       publicFolder: "static",
     },
   },
-  cmsCallback: (cms) => {
-    cms.events.subscribe('forms:submit', async (event)=> {
-      await fetch(process.env.TINA_HOOK || "", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // You can pass any necessary data to your serverless function
-        body: JSON.stringify({ message: 'New post created, trigger deployment' }),
-      });
-    })
-    return cms
-  },
+  // Call back hook to trigger in response of post submission
+  // cmsCallback: (cms) => {
+  //   cms.events.subscribe('forms:submit', async (event)=> {
+  //     await fetch(process.env.TINA_HOOK || "", {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       // You can pass any necessary data to your serverless function
+  //       body: JSON.stringify({ message: 'New post created, trigger deployment' }),
+  //     });
+  //   })
+  //   return cms
+  // },
   // See docs on content modeling for more info on how to setup new content models: https://tina.io/docs/schema/
   schema: {
     collections: [
