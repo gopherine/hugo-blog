@@ -15,6 +15,14 @@ jobs:
     steps:
     - uses: actions/checkout@v2  # Checks out your repository under $GITHUB_WORKSPACE, so your workflow can access it
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+      node-version: '18'  # Use the Node.js version that matches your development environment
+
+    - name: Install Dependencies
+      run: npm install
+
     - name: Setup Hugo
       uses: peaceiris/actions-hugo@v2
       with:
@@ -22,10 +30,7 @@ jobs:
         extended: true
 
     - name: Build
-      run: hugo --minify  # Runs the Hugo build command
-
-    - name: Build TinaCMS
-      run: npx tinacms build
+      run: npm run build  # Runs the Hugo build command
       env:
         NEXT_PUBLIC_TINA_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_TINA_CLIENT_ID }}
         TINA_TOKEN: ${{ secrets.TINA_TOKEN }}
