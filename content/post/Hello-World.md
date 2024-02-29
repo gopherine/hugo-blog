@@ -9,7 +9,7 @@ keywords:
   - rust advanced traits
   - learn rust
   - rust traits
-date: 2024-01-31T18:30:00.000Z
+date: 2024-02-28T18:30:00.000Z
 ---
 
 ***
