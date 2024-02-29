@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest  # The type of runner that the job will run on
 
     steps:
-    - uses: actions/checkout@v2  # Checks out your repository under $GITHUB_WORKSPACE, so your workflow can access it
+    - uses: actions/checkout@v4  # Checks out your repository under $GITHUB_WORKSPACE, so your workflow can access it
 
     - name: Setup Node.js
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v4
       with:
-      node-version: '18'  # Use the Node.js version that matches your development environment
+        node-version: '18'  # Use the Node.js version that matches your development environment
 
     - name: Install Dependencies
       run: npm install
