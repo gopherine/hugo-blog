@@ -183,6 +183,11 @@
         {{ block "posts" . }}{{ end }}
       {{ end }}
     </div>
+
+    <div class="flex-shrink-0 mb-4 mb-md-0">
+      {{ $.Scratch.Set "processedDirs" dict }}
+      {{ partial "sidebar.html" . }}
+    </div>
   </div>
 </div>
 <script defer>

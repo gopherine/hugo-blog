@@ -18,6 +18,9 @@ keywords:
   - Rust Struct Lifetimes
   - Rust Lifetime Parameters
   - Safe Rust Coding
+tags:
+  - rust
+  - rust tutorial
 date: 2024-02-23T18:30:00.000Z
 ---
 

@@ -9,6 +9,9 @@ keywords:
   - rust advanced traits
   - learn rust
   - rust traits
+tags:
+  - rust
+  - rust tutorial
 date: '2024-02-28T18:30:00.000Z'
 ---
 

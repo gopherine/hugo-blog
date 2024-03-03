@@ -7,6 +7,9 @@ keywords:
   - traits rust tutorial
   - rust traits
   - rust programming
+tags:
+  - rust
+  - rust tutorial
 date: 2024-02-28T18:30:00.000Z
 ---
 

@@ -12,6 +12,9 @@ keywords:
   - Rust Enums and Structs
   - Advanced Rust Techniques
   - Rust Pattern Matching
+tags:
+  - rust
+  - rust tutorial
 date: 2024-02-29T18:30:00.000Z
 ---
 

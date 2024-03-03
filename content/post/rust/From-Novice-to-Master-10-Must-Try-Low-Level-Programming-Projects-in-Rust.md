@@ -8,6 +8,9 @@ keywords:
   - rust project ideas
   - rust project
   - 10 Must-Try Low-Level Programming Projects in Rust
+tags:
+  - rust
+  - rust tutorial
 date: 2024-02-28T18:30:00.000Z
 ---
 

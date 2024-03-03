@@ -69,6 +69,14 @@ export default defineConfig({
             required: true,
           },
           {
+            type: "string",
+            list: true,
+            name: "tags",
+            label: "Tags",
+            searchable: true,
+            required: true,
+          },
+          {
             type: "datetime",
             name: "date",
             label: "Date",

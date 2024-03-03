@@ -27,7 +27,9 @@
         {{end}}
       {{ end }}
       <ul>
-        {{ range .Paginator.Pages }}
+        {{ $pages := where .Site.RegularPages "Section" "post" }}
+        {{ $paginator := .Paginate $pages }}
+        {{ range $paginator.Pages }}
         <li class="py-4 col-12 d-flex width-full border-bottom color-border-secondary public source">
           <div class="col-12 d-inline-block">
             <div class="mb-1 d-inline-block">

@@ -28,6 +28,9 @@ keywords:
   - Advanced Rust programming techniques
   - Real-time data processing Rust
   - Rust for financial data analysis
+tags:
+  - rust
+  - software architecture
 date: 2024-02-16T18:30:00.000Z
 ---
 

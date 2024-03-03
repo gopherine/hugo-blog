@@ -7,6 +7,16 @@
 <script defer src="https://fastly.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js"
   integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"
   onload="renderMathInElement(document.body);"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('#sidebar .folder > span').forEach(function(folder) {
+            folder.addEventListener('click', function() {
+                this.nextElementSibling.classList.toggle('active');
+            });
+        });
+    });
+    </script>
+    
 {{ end }}
 
 {{ if or .Params.MathJax .Site.Params.MathJax}}
