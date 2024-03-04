@@ -31,8 +31,9 @@ keywords:
 tags:
   - rust
   - software architecture
-date: 2024-02-16T18:30:00.000Z
+date: '2024-02-16T18:30:00.000Z'
 ---
+
 
 ![](/images/crab-transformed.webp)
 

@@ -15,8 +15,9 @@ keywords:
 tags:
   - rust
   - rust tutorial
-date: 2024-02-29T18:30:00.000Z
+date: '2024-02-29T18:30:00.000Z'
 ---
+
 
 ![](/images/Default_create_rust_programming_ferris_the_crab_logo_4.webp)\
 Looking to take your Rust skills to the next level? Master the art of pattern matching, one of Rust's most versatile features! This beginner-friendly guide dives into the key concepts with clear examples, helping you:
