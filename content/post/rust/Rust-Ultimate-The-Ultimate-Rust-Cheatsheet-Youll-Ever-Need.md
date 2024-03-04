@@ -30,8 +30,9 @@ keywords:
 tags:
   - rust
   - rust tutorial
-date: 2024-02-20T18:30:00.000Z
+date: '2024-02-20T18:30:00.000Z'
 ---
+
 
 ![](/images/cheatsheet.webp)
 
