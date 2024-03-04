@@ -21,8 +21,9 @@ keywords:
 tags:
   - rust
   - rust tutorial
-date: 2024-02-23T18:30:00.000Z
+date: '2024-02-23T18:30:00.000Z'
 ---
+
 
 Mastering Rust Lifetimes: The Comprehensive Guide\
 ![](/images/rust-lifetime.webp)
