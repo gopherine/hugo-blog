@@ -167,7 +167,12 @@ DROP TABLE IF EXISTS test;
 
 ```
 
-These migration files are used by the golang-migrate tool to set up and tear down the database schema during development and deployment processes.
+These migration files are used by the golang-migrate tool to set up and tear down the database schema during development and deployment processes.Once you are done writing the above, you can run below command to setup your tables and schema using migrate\
+
+
+```shell
+migrate -path repo/migrations -database "postgresql://root:secret@localhost:5432/postgres?sslmode=disable" -verbose up
+```
 
 By integrating these elements—golang-migrate for database migrations, sqlc for generating type-safe database code, godotenv for environment management, and the Echo framework for HTTP routing and middleware—you create a robust foundation for developing web applications in Go with clean architecture, separating concerns and making your codebase more maintainable and scalable.
 
