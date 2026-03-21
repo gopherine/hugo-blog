@@ -2,24 +2,57 @@
 <div class="px-3 container-xl px-md-4 px-lg-5">
   <div class="gutter-condensed gutter-lg flex-column flex-md-row d-flex">
     <div class="flex-shrink-0 mb-4 col-12 col-md-3 mb-md-0" id="left-sidebar">
-      {{/* Course navigation — shown when Articles tab is active */}}
+      {{/* Article tree — shown when Articles tab is active */}}
       {{ if .IsHome }}
       <div id="sidebar-course-nav" style="display:none; margin-top:24px;">
-        <div class="p-3">
-          <h3 class="f5 text-bold mb-2">Idiomatic Go</h3>
-          <p class="text-small text-gray mb-3">25 Patterns Every Production Engineer Should Know</p>
-          {{ $goPages := where .Site.RegularPages "Section" "in" (slice "post") }}
-          {{ $lessons := where $goPages ".Params.series" "Idiomatic Go" }}
-          <ul class="course-nav-list">
-            {{ range (sort $lessons ".Params.lesson" "asc") }}
-            <li class="course-nav-item">
-              <a href="{{ .Permalink }}" class="course-nav-link text-small">
-                <span class="course-nav-num">{{ .Params.lesson }}.</span>
-                {{ .Title | replaceRE "^Lesson \\d+: " "" | replaceRE " — .*$" "" }}
-              </a>
-            </li>
-            {{ end }}
-          </ul>
+        <div class="article-tree">
+          {{ with .Site.GetPage "section" "post" }}
+          {{ range .Sections }}
+          <div class="tree-section">
+            <div class="tree-toggle" onclick="this.classList.toggle('open'); this.nextElementSibling.style.display = this.classList.contains('open') ? 'block' : 'none';">
+              <span class="tree-icon">📁</span> {{ .Title | title }}
+              <span class="tree-count text-small text-gray">({{ len .Pages }})</span>
+            </div>
+            <div class="tree-children" style="display:none;">
+              {{/* Collect unique series names */}}
+              {{ $.Scratch.Set "seriesNames" slice }}
+              {{ range .Pages }}
+                {{ if .Params.series }}
+                  {{ $.Scratch.Add "seriesNames" .Params.series }}
+                {{ end }}
+              {{ end }}
+              {{ $seriesNames := uniq ($.Scratch.Get "seriesNames") }}
+
+              {{/* Render each series as a collapsible group */}}
+              {{ range $seriesNames }}
+                {{ $seriesName := . }}
+                {{ $seriesPages := where $.Site.RegularPages ".Params.series" $seriesName }}
+              <div class="tree-subsection">
+                <div class="tree-toggle tree-toggle--sub" onclick="this.classList.toggle('open'); this.nextElementSibling.style.display = this.classList.contains('open') ? 'block' : 'none';">
+                  <span class="tree-icon">📖</span> {{ $seriesName }}
+                  <span class="tree-count text-small text-gray">({{ len $seriesPages }})</span>
+                </div>
+                <div class="tree-children" style="display:none;">
+                  {{ range (sort $seriesPages ".Params.lesson" "asc") }}
+                  <a href="{{ .Permalink }}" class="tree-leaf text-small">
+                    {{ if .Params.lesson }}<span class="tree-num">{{ .Params.lesson }}.</span>{{ end }}
+                    {{ .Title | replaceRE "^Lesson \\d+: " "" | replaceRE " — .*$" "" }}
+                  </a>
+                  {{ end }}
+                </div>
+              </div>
+              {{ end }}
+
+              {{/* Render standalone articles (no series) */}}
+              {{ range (sort .Pages ".PublishDate" "desc") }}
+                {{ if not .Params.series }}
+              <a href="{{ .Permalink }}" class="tree-leaf text-small">{{ .Title }}</a>
+                {{ end }}
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+          {{ end }}
         </div>
       </div>
       {{ end }}
