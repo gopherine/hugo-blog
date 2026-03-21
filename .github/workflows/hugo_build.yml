@@ -53,3 +53,50 @@ jobs:
         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
         vercel-args: '--prod'
         working-directory: ./public
+
+  syndicate-linkedin:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'discussion' && github.event.action == 'created'
+    steps:
+    - name: Check discussion category
+      id: check
+      env:
+        CATEGORY: ${{ github.event.discussion.category.name }}
+      run: |
+        if [[ "$CATEGORY" == "Thoughts" || "$CATEGORY" == "Shipped" ]]; then
+          echo "should_post=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "should_post=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Post to LinkedIn
+      if: steps.check.outputs.should_post == 'true'
+      env:
+        LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+        LINKEDIN_PERSON_ID: ${{ secrets.LINKEDIN_PERSON_ID }}
+        TITLE: ${{ github.event.discussion.title }}
+        BODY: ${{ github.event.discussion.body }}
+      run: |
+        TRUNCATED_BODY=$(echo "$BODY" | head -c 2800)
+        POST_TEXT="${TITLE}
+
+        ${TRUNCATED_BODY}
+
+        Read more → https://atharvapandey.com"
+
+        ENCODED_TEXT=$(echo "$POST_TEXT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+
+        curl -s -X POST "https://api.linkedin.com/v2/ugcPosts" \
+          -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"author\": \"urn:li:person:${LINKEDIN_PERSON_ID}\",
+            \"lifecycleState\": \"PUBLISHED\",
+            \"specificContent\": {
+              \"com.linkedin.ugc.ShareContent\": {
+                \"shareCommentary\": { \"text\": ${ENCODED_TEXT} },
+                \"shareMediaCategory\": \"NONE\"
+              }
+            },
+            \"visibility\": { \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\" }
+          }"
