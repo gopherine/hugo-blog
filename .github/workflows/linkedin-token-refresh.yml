@@ -1,0 +1,38 @@
+name: Refresh LinkedIn Token
+
+on:
+  schedule:
+    - cron: '0 0 1,15 * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Refresh LinkedIn access token
+      env:
+        LINKEDIN_REFRESH_TOKEN: ${{ secrets.LINKEDIN_REFRESH_TOKEN }}
+        LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
+        LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
+      run: |
+        if [ -z "$LINKEDIN_REFRESH_TOKEN" ]; then
+          echo "No refresh token configured. Skipping."
+          exit 0
+        fi
+
+        RESPONSE=$(curl -s -X POST "https://www.linkedin.com/oauth/v2/accessToken" \
+          --data-urlencode "grant_type=refresh_token" \
+          --data-urlencode "refresh_token=$LINKEDIN_REFRESH_TOKEN" \
+          --data-urlencode "client_id=$LINKEDIN_CLIENT_ID" \
+          --data-urlencode "client_secret=$LINKEDIN_CLIENT_SECRET")
+
+        NEW_TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))")
+
+        if [ -z "$NEW_TOKEN" ]; then
+          echo "Token refresh failed."
+          exit 1
+        fi
+
+        echo "Token refreshed. Update secrets manually:"
+        echo "gh secret set LINKEDIN_ACCESS_TOKEN"
+        echo "gh secret set LINKEDIN_REFRESH_TOKEN"
