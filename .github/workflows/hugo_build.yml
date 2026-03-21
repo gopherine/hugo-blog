@@ -58,12 +58,16 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'discussion' && github.event.action == 'created'
     steps:
-    - name: Check discussion category
+    - name: Check discussion category and skip drafts
       id: check
       env:
         CATEGORY: ${{ github.event.discussion.category.name }}
+        TITLE: ${{ github.event.discussion.title }}
       run: |
-        if [[ "$CATEGORY" == "Thoughts" || "$CATEGORY" == "Shipped" ]]; then
+        if [[ "$TITLE" == "[DRAFT]"* ]]; then
+          echo "Skipping draft post"
+          echo "should_post=false" >> "$GITHUB_OUTPUT"
+        elif [[ "$CATEGORY" == "Thoughts" || "$CATEGORY" == "Shipped" ]]; then
           echo "should_post=true" >> "$GITHUB_OUTPUT"
         else
           echo "should_post=false" >> "$GITHUB_OUTPUT"

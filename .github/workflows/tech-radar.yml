@@ -1,0 +1,138 @@
+name: Tech Radar Draft Generator
+
+on:
+  schedule:
+    - cron: '0 6,18 * * *'  # 6am and 6pm UTC
+  workflow_dispatch:
+
+jobs:
+  generate-draft:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Fetch trending news and generate draft
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPO_ID: "R_kgDOLTrS1w"
+        THOUGHTS_CAT_ID: "DIC_kwDOLTrS184C468G"
+      run: |
+        set -e
+
+        # Fetch top HN stories (score > 50)
+        echo "Fetching Hacker News top stories..."
+        TOP_IDS=$(curl -s "https://hacker-news.firebaseio.com/v0/topstories.json" | python3 -c "import json,sys; print(' '.join(str(x) for x in json.load(sys.stdin)[:30]))")
+
+        python3 << 'PYSCRIPT'
+        import json, os, subprocess, urllib.request
+
+        # Fetch top stories
+        top_ids = os.environ.get("TOP_IDS", "").split()
+        stories = []
+        for sid in top_ids[:20]:
+            try:
+                with urllib.request.urlopen(f"https://hacker-news.firebaseio.com/v0/item/{sid}.json") as r:
+                    story = json.loads(r.read())
+                    if story.get("score", 0) > 50 and story.get("title"):
+                        stories.append({
+                            "title": story["title"],
+                            "url": story.get("url", ""),
+                            "score": story["score"]
+                        })
+                        if len(stories) >= 8:
+                            break
+            except:
+                continue
+
+        if len(stories) < 3:
+            print("Not enough trending stories. Skipping.")
+            exit(0)
+
+        stories_text = "\n".join(
+            f"- {s['title']} ({s['score']} points) {s['url']}" for s in stories
+        )
+
+        # Generate draft with Groq
+        prompt = f"""You are Atharva Pandey, a Polyglot Engineer and Technical Leader who ships AI-native tools and distributed systems in Go, Rust, and TypeScript.
+
+Here are today's trending tech stories from Hacker News:
+{stories_text}
+
+Pick the 3-5 most interesting stories that relate to: programming languages, AI/LLM, distributed systems, developer tools, Rust, Go, TypeScript, blockchain/web3, or systems engineering.
+
+Write a short post (150-250 words) that:
+1. Has a punchy title (not "Tech Radar" — make it specific to the content)
+2. Lists the picked stories with a 1-2 line sharp opinion or insight for each
+3. Ends with a connecting thought about what these trends mean
+4. Uses a confident, technical, slightly opinionated voice
+5. No hashtags, no emojis, no corporate fluff
+6. Include URLs as markdown links
+
+Return ONLY valid JSON:
+{{"title": "your title", "body": "your post body"}}"""
+
+        req = urllib.request.Request(
+            "https://api.groq.com/openai/v1/chat/completions",
+            data=json.dumps({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 600
+            }).encode(),
+            headers={
+                "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+                "Content-Type": "application/json"
+            }
+        )
+
+        with urllib.request.urlopen(req) as r:
+            resp = json.loads(r.read())
+
+        content = resp["choices"][0]["message"]["content"]
+
+        # Parse JSON from response
+        try:
+            # Try to extract JSON from the response
+            start = content.find("{")
+            end = content.rfind("}") + 1
+            post = json.loads(content[start:end])
+        except:
+            print(f"Failed to parse AI response. Raw: {content[:200]}")
+            exit(1)
+
+        title = post.get("title", "Tech Draft")
+        body = post.get("body", "")
+
+        if len(body) < 50:
+            print("Generated content too short. Skipping.")
+            exit(0)
+
+        # Add draft marker to body
+        draft_body = f"**⚡ DRAFT — Review before publishing**\n\n---\n\n{body}\n\n---\n\n*Auto-generated from trending HN stories. Edit this discussion to refine, then remove the DRAFT marker and it will appear on your site.*"
+
+        # Create Discussion as draft (uses a "Drafts" label to distinguish)
+        mutation = json.dumps({
+            "query": f'''mutation {{
+              createDiscussion(input: {{
+                repositoryId: "{os.environ['REPO_ID']}",
+                categoryId: "{os.environ['THOUGHTS_CAT_ID']}",
+                title: {json.dumps("[DRAFT] " + title)},
+                body: {json.dumps(draft_body)}
+              }}) {{ discussion {{ url }} }}
+            }}'''
+        })
+
+        req2 = urllib.request.Request(
+            "https://api.github.com/graphql",
+            data=mutation.encode(),
+            headers={
+                "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                "Content-Type": "application/json"
+            }
+        )
+
+        with urllib.request.urlopen(req2) as r:
+            result = json.loads(r.read())
+
+        url = result.get("data", {}).get("createDiscussion", {}).get("discussion", {}).get("url", "unknown")
+        print(f"Draft created: {url}")
+        PYSCRIPT

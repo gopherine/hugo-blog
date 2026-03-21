@@ -49,7 +49,10 @@
                   {{ with .comments }}
                     {{ $commentCount = .totalCount }}
                   {{ end }}
+                  {{/* Skip drafts */}}
+                  {{ if not (hasPrefix .title "[DRAFT]") }}
                   {{ $.Scratch.Add "feed" (dict "type" $type "title" .title "body" (.body | markdownify) "date" .createdAt "tags" $labels "reactions" $reactions "comments" $commentCount "url" .url "pinned" $isPinned "readTime" 0) }}
+                  {{ end }}
                 {{ end }}
               {{ end }}
             {{ end }}
