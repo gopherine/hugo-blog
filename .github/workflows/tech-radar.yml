@@ -5,6 +5,9 @@ on:
     - cron: '0 6,18 * * *'
   workflow_dispatch:
 
+permissions:
+  discussions: write
+
 jobs:
   generate-draft:
     runs-on: ubuntu-latest
