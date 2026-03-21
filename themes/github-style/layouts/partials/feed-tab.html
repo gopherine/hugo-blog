@@ -19,13 +19,20 @@
           {{ $repoParts := split $repo "/" }}
           {{ $owner := index $repoParts 0 }}
           {{ $name := index $repoParts 1 }}
-          {{ $queryStr := printf `{"query":"{ repository(owner: \"%s\", name: \"%s\") { discussions(categoryId: \"%s\", first: %d, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { title body createdAt url labels(first:5) { nodes { name color } } reactionGroups { content users { totalCount } } comments { totalCount } } } } }"}` $owner $name $catId $max }}
+          {{ $queryStr := printf `{"query":"{ repository(owner: \"%s\", name: \"%s\") { discussions(categoryId: \"%s\", first: %d, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { title body createdAt url author { login } labels(first:5) { nodes { name color } } reactionGroups { content users { totalCount } } comments { totalCount } } } } }"}` $owner $name $catId $max }}
           {{ $opts := dict "method" "POST" "headers" $headers "body" $queryStr }}
           {{ with resources.GetRemote "https://api.github.com/graphql" $opts }}
             {{ $resp := .Content | transform.Unmarshal }}
             {{ with $resp.data }}
               {{ with .repository.discussions.nodes }}
                 {{ range . }}
+                  {{/* Skip drafts (by label) and bot-authored posts */}}
+                  {{ $isDraft := false }}
+                  {{ $authorLogin := "" }}
+                  {{ with .author }}{{ $authorLogin = .login }}{{ end }}
+                  {{ with .labels }}{{ with .nodes }}{{ range . }}{{ if eq .name "draft" }}{{ $isDraft = true }}{{ end }}{{ end }}{{ end }}{{ end }}
+                  {{ if $isDraft }}{{ continue }}{{ end }}
+                  {{ if and (ne $authorLogin $.Site.Params.microblog.author) (ne $authorLogin (lower $.Site.Params.microblog.author)) }}{{ continue }}{{ end }}
                   {{ $isPinned := false }}
                   {{ $labels := slice }}
                   {{ with .labels }}
@@ -49,10 +56,7 @@
                   {{ with .comments }}
                     {{ $commentCount = .totalCount }}
                   {{ end }}
-                  {{/* Skip drafts */}}
-                  {{ if not (hasPrefix .title "[DRAFT]") }}
                   {{ $.Scratch.Add "feed" (dict "type" $type "title" .title "body" (.body | markdownify) "date" .createdAt "tags" $labels "reactions" $reactions "comments" $commentCount "url" .url "pinned" $isPinned "readTime" 0) }}
-                  {{ end }}
                 {{ end }}
               {{ end }}
             {{ end }}

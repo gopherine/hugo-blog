@@ -10,7 +10,7 @@ on:
   issues:
     types: [opened, edited, closed, labeled, unlabeled]
   discussion:
-    types: [created, edited, labeled]
+    types: [created, edited, labeled, unlabeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -56,22 +56,44 @@ jobs:
 
   syndicate-linkedin:
     runs-on: ubuntu-latest
-    if: github.event_name == 'discussion' && github.event.action == 'created'
+    if: github.event_name == 'discussion' && (github.event.action == 'created' || github.event.action == 'unlabeled')
     steps:
-    - name: Check discussion category and skip drafts
+    - name: Check if should post to LinkedIn
       id: check
       env:
         CATEGORY: ${{ github.event.discussion.category.name }}
-        TITLE: ${{ github.event.discussion.title }}
+        AUTHOR: ${{ github.event.discussion.user.login }}
+        LABELS: ${{ toJSON(github.event.discussion.labels) }}
+        ACTION: ${{ github.event.action }}
+        REMOVED_LABEL: ${{ github.event.label.name }}
       run: |
-        if [[ "$TITLE" == "[DRAFT]"* ]]; then
-          echo "Skipping draft post"
+        # On unlabeled: only proceed if the removed label was "draft"
+        if [[ "$ACTION" == "unlabeled" && "$REMOVED_LABEL" != "draft" ]]; then
+          echo "Unrelated label removed, skipping"
           echo "should_post=false" >> "$GITHUB_OUTPUT"
-        elif [[ "$CATEGORY" == "Thoughts" || "$CATEGORY" == "Shipped" ]]; then
-          echo "should_post=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "should_post=false" >> "$GITHUB_OUTPUT"
+          exit 0
         fi
+        # Check if discussion still has draft label
+        if echo "$LABELS" | python3 -c "import json,sys; labels=[l.get('name','') for l in json.load(sys.stdin) or []]; exit(0 if 'draft' not in labels else 1)" 2>/dev/null; then
+          : # No draft label, proceed
+        else
+          echo "Still has draft label, skipping"
+          echo "should_post=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        # Only post for correct categories
+        if [[ "$CATEGORY" != "Thoughts" && "$CATEGORY" != "Shipped" ]]; then
+          echo "Wrong category: $CATEGORY"
+          echo "should_post=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        # Only post for human author
+        if [[ "$AUTHOR" != "Gopherine" && "$AUTHOR" != "gopherine" ]]; then
+          echo "Skipping bot-authored post by $AUTHOR"
+          echo "should_post=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "should_post=true" >> "$GITHUB_OUTPUT"
 
     - name: Post to LinkedIn
       if: steps.check.outputs.should_post == 'true'

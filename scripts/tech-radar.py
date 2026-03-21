@@ -224,18 +224,19 @@ def main():
     cat_id = os.environ.get("THOUGHTS_CAT_ID", "DIC_kwDOLTrS184C468G")
 
     draft_body = (
-        f"**DRAFT** — Review before publishing\n\n---\n\n{body}\n\n---\n\n"
-        f"*Auto-generated. Remove [DRAFT] prefix from title to publish to site + LinkedIn.*"
+        f"*Auto-generated draft. Remove the `draft` label to publish to site + LinkedIn.*"
+        f"\n\n---\n\n{body}"
     )
 
+    # Create discussion
     mutation = json.dumps({
         "query": (
             f'mutation {{ createDiscussion(input: {{'
             f'repositoryId: "{repo_id}", '
             f'categoryId: "{cat_id}", '
-            f'title: {json.dumps("[DRAFT] " + title)}, '
+            f'title: {json.dumps(title)}, '
             f'body: {json.dumps(draft_body)}'
-            f'}}) {{ discussion {{ url }} }} }}'
+            f'}}) {{ discussion {{ id url }} }} }}'
         )
     })
 
@@ -247,8 +248,32 @@ def main():
         capture_output=True, text=True)
 
     data = json.loads(result.stdout)
-    url = data.get("data", {}).get("createDiscussion", {}).get("discussion", {}).get("url", "unknown")
-    print(f"Draft created: {url}")
+    discussion = data.get("data", {}).get("createDiscussion", {}).get("discussion", {})
+    url = discussion.get("url", "unknown")
+    disc_id = discussion.get("id", "")
+    print(f"Discussion created: {url}")
+
+    # Add "draft" label to the discussion
+    if disc_id:
+        # First get the label ID
+        label_result = subprocess.run(
+            ["curl", "-s", "-X", "POST", "https://api.github.com/graphql",
+             "-H", f"Authorization: Bearer {os.environ['GH_TOKEN']}",
+             "-H", "Content-Type: application/json",
+             "-d", json.dumps({"query": f'{{ repository(owner: "gopherine", name: "hugo-blog") {{ label(name: "draft") {{ id }} }} }}'})],
+            capture_output=True, text=True)
+        label_data = json.loads(label_result.stdout)
+        label_id = label_data.get("data", {}).get("repository", {}).get("label", {}).get("id", "")
+
+        if label_id:
+            add_label = json.dumps({"query": f'mutation {{ addLabelsToLabelable(input: {{labelableId: "{disc_id}", labelIds: ["{label_id}"]}}) {{ clientMutationId }} }}'})
+            subprocess.run(
+                ["curl", "-s", "-X", "POST", "https://api.github.com/graphql",
+                 "-H", f"Authorization: Bearer {os.environ['GH_TOKEN']}",
+                 "-H", "Content-Type: application/json",
+                 "-d", add_label],
+                capture_output=True, text=True)
+            print(f"Draft label added. Remove label to publish.")
 
 
 if __name__ == "__main__":
