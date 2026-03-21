@@ -350,6 +350,28 @@ body {
   border-color: #6f42c1;
 }
 
+/* Article thumbnail */
+.article-thumb {
+  width: 80px;
+  height: 80px;
+  overflow: hidden;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.article-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 480px) {
+  .article-thumb {
+    width: 60px;
+    height: 60px;
+  }
+}
+
 /* Article summary — strip images and clean up */
 .article-summary img,
 .article-summary hr {
