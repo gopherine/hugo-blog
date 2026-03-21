@@ -2,8 +2,9 @@ name: Tech Radar Draft Generator
 
 on:
   schedule:
-    - cron: '0 6,18 * * *'  # 6am and 6pm UTC
+    - cron: '0 6,18 * * *'
   workflow_dispatch:
+    inputs: {}
 
 jobs:
   generate-draft:
