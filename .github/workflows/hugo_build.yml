@@ -95,7 +95,7 @@ jobs:
         fi
         echo "should_post=true" >> "$GITHUB_OUTPUT"
 
-    - name: Post to LinkedIn
+    - name: Format and post to LinkedIn
       if: steps.check.outputs.should_post == 'true'
       env:
         LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
@@ -103,26 +103,60 @@ jobs:
         TITLE: ${{ github.event.discussion.title }}
         BODY: ${{ github.event.discussion.body }}
       run: |
-        TRUNCATED_BODY=$(echo "$BODY" | head -c 2800)
-        POST_TEXT="${TITLE}
+        python3 << 'PYEOF'
+        import json, os, subprocess, re
 
-        ${TRUNCATED_BODY}
+        title = os.environ["TITLE"]
+        body = os.environ["BODY"]
 
-        Read more → https://atharvapandey.com"
+        # Strip markdown for LinkedIn plain text:
+        # Remove **bold** → BOLD (uppercase for LinkedIn emphasis)
+        text = re.sub(r'\*\*([^*]+)\*\*', lambda m: m.group(1).upper(), body)
+        # Remove markdown links [text](url) → text (url)
+        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 (\2)', text)
+        # Remove images ![alt](url)
+        text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
+        # Remove horizontal rules
+        text = re.sub(r'^---+$', '', text, flags=re.MULTILINE)
+        # Remove HTML tags
+        text = re.sub(r'<[^>]+>', '', text)
+        # Remove auto-generated notice lines
+        text = re.sub(r'\*Auto-generated.*?\*', '', text)
+        # Clean up extra blank lines
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
 
-        ENCODED_TEXT=$(echo "$POST_TEXT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+        # Don't repeat title if body already starts with it
+        if text.lower().startswith(title.lower()):
+            post_text = text
+        else:
+            post_text = f"{title}\n\n{text}"
 
-        curl -s -X POST "https://api.linkedin.com/v2/ugcPosts" \
-          -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
-          -H "Content-Type: application/json" \
-          -d "{
-            \"author\": \"urn:li:person:${LINKEDIN_PERSON_ID}\",
-            \"lifecycleState\": \"PUBLISHED\",
-            \"specificContent\": {
-              \"com.linkedin.ugc.ShareContent\": {
-                \"shareCommentary\": { \"text\": ${ENCODED_TEXT} },
-                \"shareMediaCategory\": \"NONE\"
-              }
+        # Truncate for LinkedIn (3000 char limit) and add CTA
+        if len(post_text) > 2800:
+            post_text = post_text[:2800] + "..."
+
+        post_text += "\n\n→ https://atharvapandey.com"
+
+        # Post to LinkedIn
+        encoded = json.dumps(post_text)
+        payload = json.dumps({
+            "author": f"urn:li:person:{os.environ['LINKEDIN_PERSON_ID']}",
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    "shareCommentary": {"text": post_text},
+                    "shareMediaCategory": "NONE"
+                }
             },
-            \"visibility\": { \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\" }
-          }"
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+        })
+
+        result = subprocess.run(
+            ["curl", "-s", "-X", "POST", "https://api.linkedin.com/v2/ugcPosts",
+             "-H", f"Authorization: Bearer {os.environ['LINKEDIN_ACCESS_TOKEN']}",
+             "-H", "Content-Type: application/json",
+             "-d", payload],
+            capture_output=True, text=True)
+
+        print(f"LinkedIn response: {result.stdout[:200]}")
+        PYEOF
