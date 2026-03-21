@@ -1,0 +1,167 @@
+{{/* Feed tab — merges GitHub Discussions + Hugo articles into one stream */}}
+<div class="mt-3">
+
+  {{/* Initialize feed list */}}
+  {{ $.Scratch.Set "feed" slice }}
+
+  {{/* Fetch GitHub Discussions */}}
+  {{ if .Site.Params.microblog.enabled }}
+    {{ $token := getenv "GITHUB_TOKEN" }}
+    {{ if $token }}
+      {{ $headers := dict "Authorization" (printf "Bearer %s" $token) "Content-Type" "application/json" }}
+      {{ $repo := .Site.Params.microblog.repo }}
+      {{ $max := .Site.Params.microblog.maxPosts | default 20 }}
+      {{ $pinnedLabel := .Site.Params.microblog.pinnedLabel | default "pinned" }}
+
+      {{ $categories := dict "thought" .Site.Params.microblog.thoughtsCategoryId "shipped" .Site.Params.microblog.shippedCategoryId }}
+      {{ range $type, $catId := $categories }}
+        {{ if $catId }}
+          {{ $repoParts := split $repo "/" }}
+          {{ $owner := index $repoParts 0 }}
+          {{ $name := index $repoParts 1 }}
+          {{ $queryStr := printf `{"query":"{ repository(owner: \"%s\", name: \"%s\") { discussions(categoryId: \"%s\", first: %d, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { title body createdAt url labels(first:5) { nodes { name color } } reactionGroups { content users { totalCount } } comments { totalCount } } } } }"}` $owner $name $catId $max }}
+          {{ $opts := dict "method" "POST" "headers" $headers "body" $queryStr }}
+          {{ with resources.GetRemote "https://api.github.com/graphql" $opts }}
+            {{ $resp := .Content | transform.Unmarshal }}
+            {{ with $resp.data }}
+              {{ with .repository.discussions.nodes }}
+                {{ range . }}
+                  {{ $isPinned := false }}
+                  {{ $labels := slice }}
+                  {{ with .labels }}
+                    {{ with .nodes }}
+                      {{ range . }}
+                        {{ if eq .name $pinnedLabel }}
+                          {{ $isPinned = true }}
+                        {{ else }}
+                          {{ $labels = $labels | append .name }}
+                        {{ end }}
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+                  {{ $reactions := 0 }}
+                  {{ with .reactionGroups }}
+                    {{ range . }}
+                      {{ $reactions = add $reactions .users.totalCount }}
+                    {{ end }}
+                  {{ end }}
+                  {{ $commentCount := 0 }}
+                  {{ with .comments }}
+                    {{ $commentCount = .totalCount }}
+                  {{ end }}
+                  {{ $.Scratch.Add "feed" (dict "type" $type "title" .title "body" (.body | markdownify) "date" .createdAt "tags" $labels "reactions" $reactions "comments" $commentCount "url" .url "pinned" $isPinned "readTime" 0) }}
+                {{ end }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+        {{ end }}
+      {{ end }}
+    {{ end }}
+  {{ end }}
+
+  {{/* Add Hugo articles to feed */}}
+  {{ $posts := where .Site.RegularPages "Section" "in" (slice "post") }}
+  {{ range $posts }}
+    {{ $tags := slice }}
+    {{ with .Params.tags }}{{ $tags = . }}{{ end }}
+    {{ $.Scratch.Add "feed" (dict "type" "article" "title" .Title "body" (.Summary | safeHTML) "date" (.PublishDate.Format "2006-01-02T15:04:05Z") "tags" $tags "reactions" 0 "comments" 0 "url" .Permalink "pinned" false "readTime" .ReadingTime) }}
+  {{ end }}
+
+  {{/* Sort feed by date descending */}}
+  {{ $feed := sort ($.Scratch.Get "feed") "date" "desc" }}
+
+  {{/* Render pinned post */}}
+  {{ range $feed }}
+    {{ if .pinned }}
+    <div class="feed-item feed-item--pinned Box mb-3">
+      <div class="Box-body p-3">
+        <div class="d-flex flex-justify-between flex-items-center mb-1">
+          <span class="pinned-badge">📌 PINNED</span>
+          <span class="feed-label feed-label--{{ .type }}">{{ .type }}</span>
+        </div>
+        {{ with .title }}<div class="mb-1"><strong class="f5">{{ . }}</strong></div>{{ end }}
+        <div class="markdown-body f6">{{ .body }}</div>
+        {{ with .tags }}
+        <div class="mt-2">{{ range . }}<span class="feed-tag">{{ . }}</span>{{ end }}</div>
+        {{ end }}
+      </div>
+    </div>
+    {{ end }}
+  {{ end }}
+
+  {{/* Render feed items */}}
+  {{ range $feed }}
+    {{ if not .pinned }}
+    <div class="feed-item Box mb-3">
+      <div class="Box-body p-3">
+        <div class="d-flex flex-justify-between flex-items-center mb-1">
+          <span class="text-small text-gray">{{ dateFormat "Jan 2, 2006" .date }}</span>
+          <span class="feed-label feed-label--{{ .type }}">{{ .type }}</span>
+        </div>
+        {{ with .title }}
+        <div class="mb-1">
+          <strong class="f5">{{ . }}</strong>
+        </div>
+        {{ end }}
+        <div class="markdown-body f6">{{ .body }}</div>
+        {{ with .tags }}
+        <div class="mt-2">{{ range . }}<span class="feed-tag">{{ . }}</span>{{ end }}</div>
+        {{ end }}
+        <div class="mt-2 d-flex flex-items-center text-small text-gray">
+          {{ if gt .readTime 0 }}<span class="mr-3">📖 {{ .readTime }} min read</span>{{ end }}
+          {{ if gt .reactions 0 }}<span class="mr-3">❤️ {{ .reactions }}</span>{{ end }}
+          {{ if gt .comments 0 }}<span>💬 {{ .comments }}</span>{{ end }}
+        </div>
+      </div>
+    </div>
+    {{ end }}
+  {{ end }}
+
+  {{/* Contribution graph (from old overview.html lines 88-154) */}}
+  {{ $section := where .Site.RegularPages "Section" "in" (slice "post") }}
+  <div class="mt-4 position-relative" id="contributions" data='[{{ range $index, $elem := $section }}{
+    "title": "{{ .Title }}",
+    "link": "{{ .Permalink }}",
+    "publishDate": "{{ .PublishDate.Format "2006-01-02 15:04:05" }}"
+  }{{ if ne $index (sub (len $section) 1) }},{{ end }}{{ end }}]'>
+    <div class="js-yearly-contributions">
+      <div class="position-relative">
+        <h2 class="mb-2 f4 text-normal" id="posts-count"></h2>
+        <div class="py-2 border graph-before-activity-overview">
+          <div class="pt-1 mx-3 overflow-hidden text-center js-calendar-graph mx-md-2 d-flex flex-column flex-items-end flex-xl-items-center is-graph-loading graph-canvas calendar-graph height-full">
+            <svg width="828" height="128" class="js-calendar-graph-svg">
+              <g transform="translate(10, 20)" id="graph-svg"></g>
+            </svg>
+          </div>
+          <div class="clearfix px-3 pb-1 mx-3 mt-1 contrib-footer">
+            <div class="float-left text-gray"></div>
+            <div class="contrib-legend text-gray">
+              Less
+              <ul class="legend">
+                <li style="background-color: var(--color-calendar-graph-day-bg)"></li>
+                <li style="background-color: var(--color-calendar-graph-day-L1-bg)"></li>
+                <li style="background-color: var(--color-calendar-graph-day-L2-bg)"></li>
+                <li style="background-color: var(--color-calendar-graph-day-L3-bg)"></li>
+                <li style="background-color: var(--color-calendar-graph-day-L4-bg)"></li>
+              </ul>
+              More
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="activity-listing contribution-activity">
+      <div class="d-none d-lg-block">
+        <div class="float-right pl-5 bg-white js-profile-timeline-year-list col-2 is-placeholder" style="visibility: hidden; display: none; height: 210px;"></div>
+        <div style="top: 74px; position: static;" class="float-right pl-5 bg-white js-profile-timeline-year-list js-sticky col-2">
+          <ul class="filter-list small" id="year-list"></ul>
+        </div>
+      </div>
+      <h2 class="mt-4 mb-3 f4 text-normal">Post activity</h2>
+      <div id="posts-activity"></div>
+    </div>
+  </div>
+  <div id="pinned-items-modal-wrapper"></div>
+  <div id="svg-tip" class="svg-tip svg-tip-one-line" style="pointer-events: none; display: none;"></div>
+
+</div>
