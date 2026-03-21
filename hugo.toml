@@ -103,8 +103,8 @@ repo = "gopherine/hugo-blog"
 author = "Gopherine"
 maxPosts = 20
 pinnedLabel = "pinned"
-thoughtsCategoryId = ""
-shippedCategoryId = ""
+thoughtsCategoryId = "DIC_kwDOLTrS184C468G"
+shippedCategoryId = "DIC_kwDOLTrS184C468N"
 
 [[deployment.matchers]]
 # Cache static assets for 1 year.
