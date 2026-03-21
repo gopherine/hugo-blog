@@ -126,6 +126,38 @@ body {
   z-index: 2;
 }
 
+/* Course navigation sidebar */
+.course-nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.course-nav-item {
+  margin-bottom: 2px;
+}
+
+.course-nav-link {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  line-height: 1.4;
+}
+
+.course-nav-link:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.course-nav-num {
+  display: inline-block;
+  width: 22px;
+  color: var(--color-text-tertiary, #8b949e);
+  font-weight: 600;
+}
+
 /* Ensure first paragraph isn't hidden behind sticky post header */
 .Box-body .markdown-body > *:first-child {
   margin-top: 0.5em;

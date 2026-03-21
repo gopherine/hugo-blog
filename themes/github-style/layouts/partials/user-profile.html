@@ -1,8 +1,29 @@
 {{ if not .IsHome }}{{ partial "menus.html" . }}{{ end }}
 <div class="px-3 container-xl px-md-4 px-lg-5">
   <div class="gutter-condensed gutter-lg flex-column flex-md-row d-flex">
-    <div class="flex-shrink-0 mb-4 col-12 col-md-3 mb-md-0">
-      <div class="h-card {{ if not .IsHome }}mt-md-n5{{ end }}" style="margin-top:24px">
+    <div class="flex-shrink-0 mb-4 col-12 col-md-3 mb-md-0" id="left-sidebar">
+      {{/* Course navigation — shown when Articles tab is active */}}
+      {{ if .IsHome }}
+      <div id="sidebar-course-nav" style="display:none; margin-top:24px;">
+        <div class="p-3">
+          <h3 class="f5 text-bold mb-2">Idiomatic Go</h3>
+          <p class="text-small text-gray mb-3">25 Patterns Every Production Engineer Should Know</p>
+          {{ $goPages := where .Site.RegularPages "Section" "in" (slice "post") }}
+          {{ $lessons := where $goPages ".Params.series" "Idiomatic Go" }}
+          <ul class="course-nav-list">
+            {{ range (sort $lessons ".Params.lesson" "asc") }}
+            <li class="course-nav-item">
+              <a href="{{ .Permalink }}" class="course-nav-link text-small">
+                <span class="course-nav-num">{{ .Params.lesson }}.</span>
+                {{ .Title | replaceRE "^Lesson \\d+: " "" | replaceRE " — .*$" "" }}
+              </a>
+            </li>
+            {{ end }}
+          </ul>
+        </div>
+      </div>
+      {{ end }}
+      <div class="h-card {{ if not .IsHome }}mt-md-n5{{ end }}" style="margin-top:24px" id="sidebar-profile">
         <!-- Sticky header optimization -->
         <div class="user-profile-sticky-bar d-none d-md-block" id="headerStuck">
           <div class="py-10 user-profile-mini-vcard d-table">
@@ -216,10 +237,12 @@
       {{ end }}
     </div>
 
+    {{ if not .IsHome }}
     <div class="flex-shrink-0 mb-4 mb-md-0">
       {{ $.Scratch.Set "processedDirs" dict }}
       {{ partial "sidebar.html" . }}
     </div>
+    {{ end }}
   </div>
 </div>
 <script defer>

@@ -324,7 +324,7 @@ function setRelativeTime() {
   });
 }
 
-// Tab switching
+// Tab switching with sidebar swap
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(function(el) {
     el.style.display = 'none';
@@ -337,6 +337,19 @@ function switchTab(tabName) {
   var tab = document.querySelector('[data-tab="' + tabName + '"]');
   if (tab) tab.setAttribute('aria-current', 'page');
   history.replaceState(null, '', '#' + tabName);
+
+  // Swap sidebar: profile for Feed, course nav for Articles
+  var profile = document.getElementById('sidebar-profile');
+  var courseNav = document.getElementById('sidebar-course-nav');
+  if (profile && courseNav) {
+    if (tabName === 'articles') {
+      profile.style.display = 'none';
+      courseNav.style.display = 'block';
+    } else {
+      profile.style.display = 'block';
+      courseNav.style.display = 'none';
+    }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
