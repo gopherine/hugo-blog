@@ -9,6 +9,8 @@ on:
       - main
   issues:
     types: [opened, edited, closed, labeled, unlabeled]
+  discussion:
+    types: [created, edited, labeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
