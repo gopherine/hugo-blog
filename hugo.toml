@@ -94,12 +94,17 @@ precision=0
 keepWhitespace=false
 
 
+[params]
+description = "Polyglot Engineer · Technical Leader. I ship AI-native tools, distributed systems, and developer platforms in Go, Rust, and TypeScript."
+
 [params.microblog]
 enabled = true
 repo = "gopherine/hugo-blog"
-label = "microblog"
 author = "Gopherine"
-maxPosts = 10
+maxPosts = 20
+pinnedLabel = "pinned"
+thoughtsCategoryId = ""
+shippedCategoryId = ""
 
 [[deployment.matchers]]
 # Cache static assets for 1 year.

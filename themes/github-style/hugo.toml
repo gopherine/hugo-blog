@@ -8,7 +8,7 @@ pygmentsUseClasses=true
 
 [params]
 author="Atharva Pandey"
-description = "Dive into Atharva Pandey's tech blog for expert insights on software development, architecture, and cutting-edge technologies like Rust, Go, JavaScript, Blockchain, and AI. Decaf is BS, and so are half-baked tech articles."
+description = "Polyglot Engineer · Technical Leader. I ship AI-native tools, distributed systems, and developer platforms in Go, Rust, and TypeScript."
 github="Gopherine"
 twitter="vedaatharva"
 linkedin="atharvapandey"
@@ -24,18 +24,11 @@ location="India"
 userStatusEmoji="☕"
 
 [tagline]
-value = "Exploring the Depths of Software Engineering and Beyond"
+value = "Shipping AI-native tools and distributed systems in Go, Rust, and TypeScript"
 
 [author]
 name = "Atharva Pandey"
-bio = "A software engineer passionate about building scalable systems, exploring new technologies, and sharing knowledge. When not coding, you'll find me sipping on a bold cup of coffee (decaf is not an option)."
-
-[params.microblog]
-enabled=true
-repo="gopherine/hugo-blog"
-label="microblog"
-author="Gopherine"
-maxPosts=10
+bio = "Polyglot Engineer · Technical Leader. I ship AI-native tools, distributed systems, and developer platforms in Go, Rust, and TypeScript."
 
 [params.giscus]
 repo="gopherine/hugo-blog"
