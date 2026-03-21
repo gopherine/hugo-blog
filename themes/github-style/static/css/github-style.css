@@ -321,3 +321,31 @@ body {
   color: #6f42c1;
   font-weight: 600;
 }
+
+/* Tag filter pills */
+.tag-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-pill {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 2em;
+  border: 1px solid var(--color-border-primary);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.tag-pill:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.tag-pill--active {
+  background: #6f42c1;
+  color: #fff;
+  border-color: #6f42c1;
+}

@@ -345,3 +345,19 @@ document.addEventListener('DOMContentLoaded', function() {
     switchTab('articles');
   }
 });
+
+// Article tag filtering
+function filterArticles(tag, btn) {
+  document.querySelectorAll('.tag-pill').forEach(function(el) {
+    el.classList.remove('tag-pill--active');
+  });
+  btn.classList.add('tag-pill--active');
+  document.querySelectorAll('.article-card').forEach(function(card) {
+    if (tag === 'all') {
+      card.style.display = 'block';
+    } else {
+      var tags = (card.getAttribute('data-tags') || '').split(',');
+      card.style.display = tags.indexOf(tag) !== -1 ? 'block' : 'none';
+    }
+  });
+}
