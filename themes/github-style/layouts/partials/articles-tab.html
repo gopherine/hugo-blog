@@ -31,14 +31,20 @@
   <div class="article-card Box mb-3" data-tags="{{ delimit .Params.tags "," }}">
     <div class="Box-body p-3">
       <div class="d-flex" style="gap: 12px;">
-        {{/* Thumbnail */}}
-        {{ if $thumb }}
+        {{/* Thumbnail — image or colored placeholder */}}
         <div class="article-thumb flex-shrink-0">
           <a href="{{ .Permalink }}">
+            {{ if $thumb }}
             <img src="{{ $thumb }}" alt="{{ .Title }}" class="article-thumb-img" loading="lazy">
+            {{ else }}
+            {{ $firstTag := "code" }}
+            {{ with .Params.tags }}{{ $firstTag = index . 0 }}{{ end }}
+            <div class="article-thumb-placeholder">
+              <span>{{ substr $firstTag 0 2 | upper }}</span>
+            </div>
+            {{ end }}
           </a>
         </div>
-        {{ end }}
         {{/* Content */}}
         <div class="flex-auto" style="min-width: 0;">
           <div class="d-flex flex-justify-between flex-items-center mb-1">
