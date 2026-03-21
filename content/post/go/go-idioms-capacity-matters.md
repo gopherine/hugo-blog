@@ -1,5 +1,5 @@
 ---
-title: 'Lesson 8: Capacity Matters — The allocation tax you''re paying without knowing'
+title: "Lesson 8: Capacity Matters — The allocation tax you''re paying without knowing"
 author: Atharva Pandey
 keywords:
   - Go

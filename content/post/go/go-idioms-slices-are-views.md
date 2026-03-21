@@ -1,5 +1,5 @@
 ---
-title: 'Lesson 7: Slices Are Views, Not Arrays — Mutations you didn''t ask for'
+title: "Lesson 7: Slices Are Views, Not Arrays — Mutations you didn''t ask for"
 author: Atharva Pandey
 keywords:
   - Go
