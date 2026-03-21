@@ -1,4 +1,4 @@
-{{ partial "menus.html" . }}
+{{ if not .IsHome }}{{ partial "menus.html" . }}{{ end }}
 <div class="px-3 container-xl px-md-4 px-lg-5">
   <div class="gutter-condensed gutter-lg flex-column flex-md-row d-flex">
     <div class="flex-shrink-0 mb-4 col-12 col-md-3 mb-md-0">
@@ -208,7 +208,7 @@
     </div>
 
     <div class="flex-shrink-0 mb-4 col-12 col-md-9 mb-md-0">
-      {{ partial "mobile-menus.html" . }}
+      {{ if not .IsHome }}{{ partial "mobile-menus.html" . }}{{ end }}
       {{ if .IsHome }}
         {{ partial "homepage-content.html" . }}
       {{ else }}

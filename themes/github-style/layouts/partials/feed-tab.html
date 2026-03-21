@@ -1,4 +1,4 @@
-{{/* Feed tab — merges GitHub Discussions + Hugo articles into one stream */}}
+{{/* Feed tab — GitHub Discussions only (micro-posts) */}}
 <div class="mt-3">
 
   {{/* Initialize feed list */}}
@@ -59,16 +59,15 @@
     {{ end }}
   {{ end }}
 
-  {{/* Add Hugo articles to feed */}}
-  {{ $posts := where .Site.RegularPages "Section" "in" (slice "post") }}
-  {{ range $posts }}
-    {{ $tags := slice }}
-    {{ with .Params.tags }}{{ $tags = . }}{{ end }}
-    {{ $.Scratch.Add "feed" (dict "type" "article" "title" .Title "body" (.Summary | safeHTML) "date" (.PublishDate.Format "2006-01-02T15:04:05Z") "tags" $tags "reactions" 0 "comments" 0 "url" .Permalink "pinned" false "readTime" .ReadingTime) }}
-  {{ end }}
-
   {{/* Sort feed by date descending */}}
   {{ $feed := sort ($.Scratch.Get "feed") "date" "desc" }}
+
+  {{/* Empty state — no Discussions yet */}}
+  {{ if eq (len $feed) 0 }}
+  <div class="Box p-4 mb-3 text-center text-gray">
+    <p class="f5">No posts yet. Discussions will appear here.</p>
+  </div>
+  {{ end }}
 
   {{/* Render pinned post */}}
   {{ range $feed }}
