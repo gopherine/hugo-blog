@@ -117,35 +117,56 @@ def fetch_arxiv():
     return items
 
 
-PROMPT_TEMPLATE = """You are writing a technical micro-essay for senior engineers who build production systems in Go, Rust, and TypeScript. They work on AI/LLM tooling, distributed systems, and developer infrastructure.
+PROMPT_TEMPLATE = """You are writing a structured technical LinkedIn post for senior engineers who build production systems in Go, Rust, and TypeScript. They work on AI/LLM tooling, distributed systems, and developer infrastructure.
 
 Raw material from GitHub Trending, Lobste.rs, Hacker News, and arXiv:
 
 {context}
 
-YOUR JOB: Pick the ONE most technically interesting item. Read its README/abstract/description carefully. Write a deep technical micro-essay (250-400 words).
+YOUR JOB: Pick the ONE most technically interesting item. Read its README/abstract/description carefully. Write a structured technical post (300-450 words).
 
-DO NOT announce that something launched. TEACH the reader something they would only know if they read the source code or paper.
+FORMAT YOUR POST WITH THIS EXACT STRUCTURE using markdown bold headers:
 
-GOOD: "Codex uses git worktrees to run subagents in parallel — each agent gets an isolated copy of the repo on a separate branch. This is fork-join parallelism at the repository level. The merge step is where it gets interesting: merge conflicts become your synchronization primitive. Agent parallelism scales linearly with module independence. Tightly coupled codebases hit a wall. The architectural lesson: if you want AI agents to work in parallel on your code, your code needs clean module boundaries."
+1. Opening line — one punchy sentence that states the core technical insight (no intro fluff)
 
-BAD: "Codex launched subagents that let you work faster. This is exciting for developer productivity."
+2. **The architecture decision:**
+   2-3 sentences explaining what technical choice was made and WHY. Name specific patterns, data structures, syscalls, protocols.
 
-Your post MUST contain:
-- A specific architecture decision and WHY it was chosen
-- A concrete tradeoff (benefit AND cost)
-- At least one detail only visible from source code/README, not the headline
-- A connection to a broader engineering principle
+3. **The tradeoff nobody talks about:**
+   2-3 sentences on the cost of this approach. When does it break? What workloads defeat it? Be specific — mention numbers, thresholds, failure modes.
 
-ZERO marketing words (exciting, innovative, game-changer, powerful, revolutionary).
-ZERO filler intros (In today's world, As engineers, Let's dive in).
-Start with the technical meat in sentence one.
-Every sentence must teach or claim something specific.
-Write like explaining to a peer over coffee.
-Include source URL as markdown link.
-Title = a specific technical insight, NOT a topic label.
+4. **The implementation detail:**
+   2-3 sentences about something you'd only learn by reading the source code or paper. A specific function, algorithm choice, or design constraint.
 
-Return ONLY valid JSON: {{"title": "your specific technical claim", "body": "your micro-essay"}}"""
+5. **The engineering principle:**
+   2-3 sentences connecting this to a broader pattern. "This is the same pattern as X in Y" — help the reader connect new knowledge to what they already know.
+
+6. Source link as markdown.
+
+EXAMPLE POST:
+
+Zeroboot creates VM sandboxes in under a millisecond using copy-on-write forking. Here's why that matters technically:
+
+**The architecture decision:**
+Instead of booting a fresh VM, Zeroboot fork()s an already-running VM snapshot. The child process shares the parent's memory pages until either process writes — then the kernel copies just that page. Full isolation with near-zero startup cost.
+
+**The tradeoff nobody talks about:**
+CoW forking is fast for READ-heavy workloads. But if your AI agent writes to many memory pages quickly, you trigger a storm of page faults — each one copies a 4KB page. An agent that allocates 100MB of heap on startup defeats the entire purpose.
+
+**The implementation detail:**
+Zeroboot uses libc directly for fork semantics rather than a hypervisor layer. Sandboxes are Linux processes, not VMs — they share the host kernel. Faster, but the isolation boundary is the process, not hardware-enforced.
+
+**The engineering principle:**
+Same pattern as Redis BGSAVE — fork the process, let the child serialize state while the parent continues serving. CoW makes the fork nearly free. If your workload is read-heavy with occasional writes, CoW forking gives you snapshot isolation at almost zero cost.
+
+RULES:
+- ZERO marketing words (exciting, innovative, game-changer, powerful, revolutionary)
+- ZERO filler intros (In today's world, As engineers, Let's dive in)
+- Every sentence teaches something specific
+- Title = a specific technical claim, NOT a topic label
+- Include source URL as markdown link
+
+Return ONLY valid JSON: {{"title": "your specific technical claim", "body": "your structured post"}}"""
 
 
 def main():
@@ -170,7 +191,24 @@ def main():
 
     start = content.find("{")
     end = content.rfind("}") + 1
-    post = json.loads(content[start:end])
+    raw_json = content[start:end]
+    # Fix unescaped newlines inside JSON string values
+    raw_json = raw_json.replace("\n", "\\n").replace("\t", "\\t")
+    # But don't double-escape already escaped ones
+    raw_json = raw_json.replace("\\\\n", "\\n")
+    try:
+        post = json.loads(raw_json)
+    except json.JSONDecodeError:
+        # Fallback: extract title and body manually
+        title_match = re.search(r'"title"\s*:\s*"(.*?)"', raw_json)
+        body_start = raw_json.find('"body"')
+        if title_match and body_start != -1:
+            title_val = title_match.group(1)
+            body_val = raw_json[body_start:].split(':', 1)[1].strip().strip('"').rstrip('}"').strip('"')
+            post = {"title": title_val, "body": body_val.replace("\\n", "\n")}
+        else:
+            print(f"Failed to parse response: {raw_json[:200]}")
+            return
 
     title = post.get("title", "")
     body = post.get("body", "")
