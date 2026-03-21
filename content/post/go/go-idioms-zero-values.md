@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: Zero Values Are Useful'
+title: 'Lesson 10: Zero Values Are Useful — Go types that work before you touch them'
 author: Atharva Pandey
 keywords:
   - Go
@@ -13,25 +13,49 @@ keywords:
 tags:
   - Go tutorial
   - golang
+series: "Idiomatic Go"
+lesson: 10
 date: '2026-03-09T00:00:00.000Z'
 ---
-""` (empty string)
-- Pointers, slices, maps, channels, functions, interfaces: `nil`
-- Structs: each field initialized to its own zero value
 
-This happens everywhere — local variables, struct fields, slice elements, map values. There is no concept of an "uninitialized" variable in Go. The question is not whether a value is initialized, but whether its zero value is meaningful.
+In most languages, a freshly declared variable is either uninitialized garbage you can't touch safely, or it needs a constructor call before it does anything useful. Go takes a different approach: every variable always has a value. When you don't provide one, Go assigns the zero value for the type. What makes this interesting is that Go's standard library is full of types designed so that their zero value is immediately useful — no constructor required.
 
-## sync.Mutex: A Zero Value That Works Out of the Box
+## The Problem
 
-The most cited example of a useful zero value in the standard library is `sync.Mutex`. You do not need to call any constructor. You do not need to `New` it. You just declare it and use it.
+The constructor-everywhere pattern is what you'll write if you're not thinking about zero values:
 
 ```go
-// WRONG: unnecessary initialization
-mu := sync.Mutex{}  // valid but redundant
-mu.Lock()
-// ...
-mu.Unlock()
+// WRONG design: requires a constructor to be usable
+type RateLimiter struct {
+    maxPerSec int
+}
+
+func NewRateLimiter(max int) *RateLimiter {
+    return &RateLimiter{maxPerSec: max}
+}
+
+func (r *RateLimiter) Allow() bool {
+    return r.maxPerSec > 0 // zero value = reject everything — not useful
+}
 ```
+
+The zero value here actively works against you. A `RateLimiter{}` rejects all requests, which is the worst possible default. Anyone who embeds this type in a struct and forgets the constructor gets silent rejections.
+
+The nil map problem is the most common sharp edge when zero values aren't thought through. Reading from a nil map is safe and returns the zero value for the value type. But writing to a nil map panics:
+
+```go
+// WRONG: writing to a nil map panics
+var counts map[string]int
+counts["hello"]++ // panic: assignment to entry in nil map
+```
+
+This is an unintuitive asymmetry that causes real bugs.
+
+## The Idiomatic Way
+
+Design your types so the zero value is a valid, sensible state. The standard library does this throughout, and it's worth copying.
+
+`sync.Mutex` is the canonical example. You don't need to call any constructor. You don't need to `New` it. Just declare it and use it:
 
 ```go
 // RIGHT: zero value is a valid, unlocked mutex
@@ -41,7 +65,7 @@ defer mu.Unlock()
 // ...
 ```
 
-More usefully, when `sync.Mutex` is embedded in a struct, the struct itself is ready to use without any initialization code:
+This pays off more when `sync.Mutex` is embedded in a struct — the containing struct is ready to use without any initialization code:
 
 ```go
 type SafeCounter struct {
@@ -68,17 +92,9 @@ counter.Increment()
 fmt.Println(counter.Value()) // 2
 ```
 
-`SafeCounter` works correctly without a `NewSafeCounter` function. The zero value of `sync.Mutex` is an unlocked mutex, and the zero value of `int` is zero. The struct's zero value is immediately useful.
-
-## bytes.Buffer: Write Without Initialization
-
-`bytes.Buffer` is another standard library type where the zero value is immediately functional. You can write to a `bytes.Buffer` without calling `new(bytes.Buffer)` or any constructor.
+`bytes.Buffer` works the same way — write to it without calling `new` or any constructor:
 
 ```go
-// WRONG: unnecessary allocation
-buf := bytes.NewBuffer(nil) // valid, but unnecessary
-buf.WriteString("hello")
-
 // RIGHT: zero value works directly
 var buf bytes.Buffer
 buf.WriteString("hello, ")
@@ -86,100 +102,29 @@ buf.WriteString("world")
 fmt.Println(buf.String()) // "hello, world"
 ```
 
-This is especially clean when `bytes.Buffer` is embedded in a struct — the struct is ready to write to immediately upon allocation, without any separate initialization step.
-
-## Designing Your Own Types with Useful Zero Values
-
-The standard library's approach is a pattern worth copying in your own code. The guiding question when designing a type is: *is the zero value of this type a valid and sensible default?*
-
-Consider a rate limiter that defaults to allowing all requests when not configured:
-
-```go
-// WRONG design: requires a constructor to be usable
-type RateLimiter struct {
-    maxPerSec int
-    // zero value: maxPerSec=0, which means "reject everything" — not useful
-}
-
-func NewRateLimiter(max int) *RateLimiter {
-    return &RateLimiter{maxPerSec: max}
-}
-
-func (r *RateLimiter) Allow() bool {
-    return r.maxPerSec > 0 // zero value rejects all requests — bad default
-}
-```
+For your own types, the approach is to make the zero state of each field represent a sensible default. The rate limiter example becomes clean with one design decision:
 
 ```go
 // RIGHT design: zero value means "allow everything" (sensible default)
 type RateLimiter struct {
     maxPerSec int
-    // zero value: maxPerSec=0 means unlimited — useful default
+    // zero value: maxPerSec=0 means unlimited
 }
 
 func (r *RateLimiter) Allow() bool {
     if r.maxPerSec == 0 {
-        return true // zero means unlimited
+        return true // zero means unlimited — useful for dev/test
     }
     // ... actual rate limiting logic
     return true
 }
 ```
 
-With the second design, code that embeds `RateLimiter` without configuring it gets a "pass everything through" default, which is sensible for development, testing, and any context where rate limiting is not yet needed.
+Now `RateLimiter{}` is immediately useful in development, testing, and anywhere rate limiting isn't needed yet.
 
-A more complete example — a logger with configurable level:
-
-```go
-type LogLevel int
-
-const (
-    LogLevelInfo  LogLevel = 0 // zero value = info — sensible default
-    LogLevelWarn  LogLevel = 1
-    LogLevelError LogLevel = 2
-)
-
-type Logger struct {
-    Level  LogLevel
-    output io.Writer
-}
-
-func (l *Logger) writer() io.Writer {
-    if l.output == nil {
-        return os.Stdout // nil output defaults to stdout
-    }
-    return l.output
-}
-
-func (l *Logger) Info(msg string) {
-    if l.Level <= LogLevelInfo {
-        fmt.Fprintln(l.writer(), "[INFO]", msg)
-    }
-}
-```
-
-A zero-value `Logger` logs everything to stdout at info level — a perfectly reasonable default. No constructor required.
-
-## When Zero Values Bite: nil Maps
-
-Not all zero values are immediately safe to use in all ways. The canonical example is a nil map. You can *read* from a nil map (it returns the zero value for the value type), but you cannot *write* to a nil map — it panics.
+For the nil map problem, lazy initialization gives you the best of both worlds:
 
 ```go
-// WRONG: writing to a nil map panics
-var counts map[string]int
-counts["hello"]++ // panic: assignment to entry in nil map
-```
-
-```go
-// RIGHT: initialize the map before writing
-counts := make(map[string]int)
-counts["hello"]++
-```
-
-This is a genuine zero value trap. The zero value of a map is `nil`, and `nil` maps are not writable. The idiomatic fix is to either initialize in a constructor or use a pattern that lazily initializes:
-
-```go
-// A struct that lazily initializes its map on first use
 type WordCounter struct {
     counts map[string]int
 }
@@ -196,50 +141,11 @@ func (w *WordCounter) Count(word string) int {
 }
 ```
 
-`WordCounter` has a useful zero value: you can call `Count` immediately (returns 0), and `Add` initializes the map on first use. Callers never need to construct it — `var wc WordCounter` and you are ready to go.
+`var wc WordCounter` works immediately — you can call `Count` right away (returns 0), and `Add` initializes the map on first use. No constructor required.
 
-## When Zero Values Bite: nil Channels
+## In The Wild
 
-A nil channel is another case where the zero value has specific, sometimes surprising behavior:
-
-- Sending to a nil channel blocks forever
-- Receiving from a nil channel blocks forever
-- A nil channel in a `select` case is ignored (never selected)
-
-The third behavior is actually useful:
-
-```go
-// Using nil channel to disable a select case
-func merge(ch1, ch2 <-chan int) <-chan int {
-    out := make(chan int)
-    go func() {
-        defer close(out)
-        for ch1 != nil || ch2 != nil {
-            select {
-            case v, ok := <-ch1:
-                if !ok {
-                    ch1 = nil // disable this case once channel is closed
-                    continue
-                }
-                out <- v
-            case v, ok := <-ch2:
-                if !ok {
-                    ch2 = nil // disable this case once channel is closed
-                    continue
-                }
-                out <- v
-            }
-        }
-    }()
-    return out
-}
-```
-
-Setting a channel variable to `nil` after it closes disables that `select` case. This is idiomatic Go for merging channels — the nil channel zero value is genuinely useful here.
-
-## The sync.Once Pattern
-
-`sync.Once` is another zero-value-ready type. It ensures a function is called exactly once, no matter how many goroutines call it concurrently. No initialization needed:
+`sync.Once` is another zero-value-ready type from the standard library. It ensures a function runs exactly once regardless of how many goroutines call it concurrently:
 
 ```go
 type Connection struct {
@@ -259,15 +165,50 @@ func (c *Connection) DB() *sql.DB {
 }
 ```
 
-`Connection` works at zero value. The first call to `DB()` initializes the database connection; all subsequent calls return the cached connection. No constructor, no `sync.Mutex` to initialize separately, no `initialized bool` field to track.
+`Connection` works at zero value. First call to `DB()` initializes the connection; every subsequent call returns the cached one. No constructor, no separate mutex to initialize, no `initialized bool` field to track — the zero value handles all of it.
 
-## The Principle
+Nil channels have a related useful behavior worth knowing about. A nil channel in a `select` case is silently ignored — never selected. This is intentional and idiomatic for disabling select cases:
 
-When you design a type in Go, think about what the zero value means and whether you can make it useful. The payoff is that users of your type never have to write `NewFoo()` just to get something that does nothing. Embedding your type in a struct does not require an init step. Tests can create `&MyType{}` without a bunch of required arguments.
+```go
+func merge(ch1, ch2 <-chan int) <-chan int {
+    out := make(chan int)
+    go func() {
+        defer close(out)
+        for ch1 != nil || ch2 != nil {
+            select {
+            case v, ok := <-ch1:
+                if !ok {
+                    ch1 = nil // disable this case once channel closes
+                    continue
+                }
+                out <- v
+            case v, ok := <-ch2:
+                if !ok {
+                    ch2 = nil
+                    continue
+                }
+                out <- v
+            }
+        }
+    }()
+    return out
+}
+```
 
-The canonical checklist:
-1. What does the zero value of each field represent?
-2. Is there a sensible behavior for the type when all fields are at their zero values?
-3. If a field being nil or zero is dangerous, can you add a nil-check or lazy initialization to handle it gracefully?
+Setting a channel to `nil` after it closes disables that arm of the select. This is idiomatic Go for channel merging — the nil zero value is being used deliberately, not defensively.
 
-Not every type can have a useful zero value — sometimes there is mandatory configuration that has no sensible default. But when you can arrange for the zero value to be useful, you should. It makes your API easier to use, your code easier to test, and your struct initialization cleaner. That is idiomatic Go.
+## The Gotchas
+
+**Not all zero values are safe in all ways.** The nil map write panic is the most common example. A nil slice is safe to read and append to, but a nil map cannot be written to. These asymmetries exist; the solution isn't to avoid nil values but to design types that handle them gracefully through nil checks or lazy initialization.
+
+**Don't force a useful zero value when the semantics don't support it.** Some types have mandatory configuration with no sensible default — a database connection pool needs a connection string, a rate limiter might need an explicit "no limit" constant rather than relying on zero. Forcing a zero-value-usable design when the domain doesn't support it leads to confusing APIs. The goal is useful zero values where they make sense, not zero values everywhere at any cost.
+
+**The zero value of an interface is nil, which is a different flavor of "nothing."** A nil interface and a non-nil interface holding a nil pointer are not the same thing — the latter satisfies type assertions and can have methods called on it (potentially panicking). This is a separate topic but worth keeping in mind when your zero-value-ready type involves interface fields.
+
+## Key Takeaway
+
+When you design a type in Go, the zero value question is worth asking explicitly: is the zero value a valid, useful state? If you can make it one, you should. The payoff is real: users of your type don't need to call `NewFoo()` just to get a no-op default. Embedding your type doesn't require a separate init step. Tests can declare `var thing MyType` and start calling methods. The standard library demonstrates this consistently with `sync.Mutex`, `bytes.Buffer`, `sync.Once`, and others — zero-value-ready types are a gift to everyone who uses them. Design your types the same way.
+
+---
+
+← [Lesson 9: range Gotchas](/post/go/go-idioms-range-gotchas/) | [Course Index](#) | [Lesson 11: nil vs Empty Slice →](/post/go/go-idioms-nil-vs-empty-slice/)

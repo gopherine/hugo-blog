@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: iota for Enums'
+title: 'Lesson 13: iota for Enums — Constants that count themselves'
 author: Atharva Pandey
 keywords:
   - Go
@@ -13,151 +13,109 @@ tags:
   - Go tutorial
   - golang
 date: '2025-09-22T00:00:00.000Z'
+series: "Idiomatic Go"
+lesson: 13
 ---
-"unset", not a valid direction
-    North              // 1
-    South              // 2
-    East               // 3
-    West               // 4
-)
 
-func navigate(d Direction) {
-    if d == 0 {
-        // zero value means "not set"
-        panic("direction not initialized")
-    }
-}
-```
+Go doesn't have a built-in enum keyword. What it has is `iota`, a constant counter that resets to zero at the start of each `const` block and increments with every constant declaration. It sounds underwhelming. In practice it gives you typed enums, bitmask permissions, and self-maintaining constant sequences — all without any runtime overhead.
 
-This makes a zero-value `Direction` represent an explicitly invalid state, which can help catch bugs where a direction variable was never assigned.
+## The Problem
 
-Alternatively, name the zero case explicitly:
+The naive approach to enums in Go is plain integer constants or string constants. Both work, but neither gives you type safety:
 
 ```go
-type Direction int
-
+// WRONG — untyped constants, no compile-time safety
 const (
-    DirectionUnknown Direction = iota // 0 — explicit "not set" sentinel
-    North
-    South
-    East
-    West
+    StatusPending  = 0
+    StatusActive   = 1
+    StatusInactive = 2
+    StatusBanned   = 3
 )
+
+func updateStatus(userID string, status int) error {
+    // nothing stops a caller from passing 42 here
+}
+
+// Called later in some other file...
+updateStatus(id, 99) // compiles fine, invalid state at runtime
 ```
 
-Which approach you use depends on whether you want the zero value to be a valid state in your domain.
+The function signature says `int`. The caller passes any integer. You only find out at runtime — probably via a database constraint violation or a confused switch statement — that 99 is not a valid status. You also have no human-readable representation: logging shows `2`, not `StatusInactive`.
 
-## Bit Flags with iota
+## The Idiomatic Way
 
-This is where `iota` gets genuinely powerful. Using `1 << iota` you can build bitmask constants for permissions, feature flags, and other set-valued states:
+Define a named type based on `int`, then use `iota` in a `const` block:
+
+```go
+type UserStatus int
+
+const (
+    StatusPending  UserStatus = iota // 0
+    StatusActive                     // 1
+    StatusInactive                   // 2
+    StatusBanned                     // 3
+)
+
+func updateStatus(userID string, status UserStatus) error {
+    // now the compiler enforces the type
+}
+
+// This no longer compiles:
+updateStatus(id, 99) // cannot use 99 (untyped int constant) as type UserStatus
+```
+
+The type system now prevents passing arbitrary integers. You still need a bounds check for values that come from external sources (a database int column, a JSON number), but code that stays within Go gets compile-time enforcement.
+
+For bitmask permissions, `1 << iota` gives you power-of-two values:
 
 ```go
 type Permission uint
 
 const (
-    PermRead    Permission = 1 << iota // 1 (0001)
-    PermWrite                          // 2 (0010)
-    PermExecute                        // 4 (0100)
-    PermAdmin                          // 8 (1000)
+    PermRead    Permission = 1 << iota // 1  (0001)
+    PermWrite                          // 2  (0010)
+    PermExecute                        // 4  (0100)
+    PermAdmin                          // 8  (1000)
 )
 
 func hasPermission(userPerms, required Permission) bool {
     return userPerms&required == required
 }
 
-func main() {
-    // Grant read and write
-    userPerms := PermRead | PermWrite
-
-    fmt.Println(hasPermission(userPerms, PermRead))    // true
-    fmt.Println(hasPermission(userPerms, PermExecute)) // false
-    fmt.Println(hasPermission(userPerms, PermAdmin))   // false
-
-    // Admin gets everything
-    adminPerms := PermRead | PermWrite | PermExecute | PermAdmin
-    fmt.Println(hasPermission(adminPerms, PermExecute)) // true
-}
+// Grant read and write, check later
+userPerms := PermRead | PermWrite
+fmt.Println(hasPermission(userPerms, PermRead))    // true
+fmt.Println(hasPermission(userPerms, PermExecute)) // false
 ```
 
-This pattern is used throughout the Go standard library and operating system APIs. `os.O_RDONLY`, `os.O_WRONLY`, `os.O_CREATE` are bit flags. HTTP method constants in some routing libraries use this pattern.
+This pattern is how `os.O_RDONLY`, `os.O_WRONLY`, and `os.O_CREATE` work in the standard library.
 
-## Adding a String() Method with go generate and stringer
-
-The biggest practical limitation of `iota` enums is that they print as integers by default. If you log a `UserStatus` value, you get `2` instead of `StatusActive`. Debugging this is painful.
-
-The manual approach is to add a `String()` method:
+For the zero-value question: sometimes you want zero to be an explicitly invalid state, so you catch uninitialized variables. Sometimes you want it to be a sensible default. Both are valid:
 
 ```go
-func (s UserStatus) String() string {
-    switch s {
-    case StatusPending:
-        return "Pending"
-    case StatusActive:
-        return "Active"
-    case StatusInactive:
-        return "Inactive"
-    case StatusBanned:
-        return "Banned"
-    default:
-        return fmt.Sprintf("UserStatus(%d)", int(s))
-    }
-}
-```
-
-This works but is tedious to maintain. The idiomatic solution is the `stringer` tool from `golang.org/x/tools`:
-
-```go
-//go:generate stringer -type=UserStatus
-
-type UserStatus int
-
+// Zero is invalid — use a blank identifier to skip it
+type Direction int
 const (
-    StatusPending  UserStatus = iota
-    StatusActive
-    StatusInactive
-    StatusBanned
+    _     Direction = iota // 0 — skip it, zero means "not set"
+    North                  // 1
+    South                  // 2
+    East                   // 3
+    West                   // 4
+)
+
+// Zero is valid — give it an explicit name
+type ApprovalState int
+const (
+    ApprovalDraft     ApprovalState = iota // 0 — sensible default
+    ApprovalSubmitted                       // 1
+    ApprovalApproved                        // 2
+    ApprovalRejected                        // 3
 )
 ```
 
-Running `go generate` produces a `userstatus_string.go` file with the `String()` method automatically. It also handles the default case for unknown values. Add the `//go:generate` comment near the type definition, commit the generated file to version control, and re-run `go generate` whenever you add new constants.
+## In The Wild
 
-## iota Expressions for Real-World Patterns
-
-`iota` can appear in any constant expression, not just assignments. This enables patterns like HTTP status code groupings:
-
-```go
-type HTTPStatusGroup int
-
-const (
-    StatusGroupInformational HTTPStatusGroup = (iota + 1) * 100 // 100
-    StatusGroupSuccess                                           // 200
-    StatusGroupRedirection                                       // 300
-    StatusGroupClientError                                       // 400
-    StatusGroupServerError                                       // 500
-)
-
-func classifyStatus(code int) HTTPStatusGroup {
-    return HTTPStatusGroup(code / 100 * 100)
-}
-```
-
-Or memory size constants:
-
-```go
-const (
-    _           = iota // ignore first value
-    KB float64  = 1 << (10 * iota) // 1 << 10 = 1024
-    MB                              // 1 << 20
-    GB                              // 1 << 30
-    TB                              // 1 << 40
-)
-```
-
-This is taken almost directly from the Go tour and is a classic example of `iota` in an expression context. The `_` discards the first value (which would be `1 << 0 = 1`, not a useful size unit).
-
-## A Real-World Enum Pattern: Workflow States
-
-Putting it all together, here is how you might model a document approval workflow:
+Here's how I use this for a document approval workflow. The typed state prevents invalid transitions and the `stringer` tool generates human-readable output automatically:
 
 ```go
 //go:generate stringer -type=ApprovalState
@@ -165,11 +123,11 @@ Putting it all together, here is how you might model a document approval workflo
 type ApprovalState int
 
 const (
-    ApprovalDraft     ApprovalState = iota // 0 — valid zero value here
-    ApprovalSubmitted                       // 1
-    ApprovalReview                         // 2
-    ApprovalApproved                       // 3
-    ApprovalRejected                       // 4
+    ApprovalDraft     ApprovalState = iota
+    ApprovalSubmitted
+    ApprovalReview
+    ApprovalApproved
+    ApprovalRejected
 )
 
 type Document struct {
@@ -185,31 +143,46 @@ func (d *Document) Submit() error {
     d.State = ApprovalSubmitted
     return nil
 }
-
-func (d *Document) Approve() error {
-    if d.State != ApprovalReview {
-        return fmt.Errorf("cannot approve document in state %s, must be in Review", d.State)
-    }
-    d.State = ApprovalApproved
-    return nil
-}
 ```
 
-Because `String()` is defined (via `stringer`), the error messages print the state name, not a number. The typed constant prevents passing arbitrary integers into the state machine. The zero value (`ApprovalDraft`) is a sensible default for a new document.
+Running `go generate` creates a `approvalstate_string.go` file with a `String()` method. The error message prints `"cannot submit document in state ApprovalApproved"` instead of `"cannot submit document in state 3"`. That single line of `//go:generate` saves you from writing and maintaining a switch statement for the rest of the project's life.
 
-## What iota Cannot Do
+## The Gotchas
 
-`iota` is not a full-blown enum. There is no built-in exhaustive switch checking — the compiler will not warn you if you add a new constant and forget to handle it in a switch statement. For that you need either `go vet` with the `exhaustive` analyzer (a third-party tool) or a careful code review discipline.
-
-Also, `iota` values are not stable across reordering. If you insert a new constant in the middle of the block, every constant after it shifts. Never store `iota`-based constants in a database or external file unless you explicitly assign stable values. For persistent storage, assign explicit values:
+**iota values shift when you reorder constants.** If you insert a new state in the middle of a `const` block, every constant after it gets a new numeric value. If you've stored these numbers in a database, you've just corrupted your data:
 
 ```go
-// RIGHT for persistent storage
+// Before: StatusActive = 1, StatusInactive = 2
+// After inserting StatusSuspended between them:
 const (
-    StatusPending  UserStatus = 1 // explicit, stable
-    StatusActive   UserStatus = 2
-    StatusInactive UserStatus = 3
+    StatusPending   UserStatus = iota // 0 — same
+    StatusActive                      // 1 — same
+    StatusSuspended                   // 2 — NEW, shifted everything below it
+    StatusInactive                    // 3 — was 2, now 3 — DATABASE MISMATCH
+    StatusBanned                      // 4 — was 3, now 4
 )
 ```
 
-Use `iota` for in-memory state, bit flags, and internal constants. Use explicit values when the numbers need to survive a refactor.
+For anything stored externally, assign explicit stable values instead of relying on `iota`'s ordering:
+
+```go
+const (
+    StatusPending   UserStatus = 1
+    StatusActive    UserStatus = 2
+    StatusSuspended UserStatus = 5 // appended, not inserted
+    StatusInactive  UserStatus = 3
+    StatusBanned    UserStatus = 4
+)
+```
+
+**No exhaustive switch checking by default.** The compiler won't warn you if you add a new constant and forget to handle it in a switch. The `exhaustruct` and `exhaustive` static analysis tools catch this. Wire them into your CI and you get the safety you'd expect from a proper enum.
+
+**iota only works inside `const` blocks.** You can't use it in a `var` block or as a function argument. It's a compile-time construct, which is also why it has zero runtime cost.
+
+## Key Takeaway
+
+`iota` is Go's enum mechanism, and it's more capable than it first appears. The typed constant pattern gives you compile-time type safety, the `1 << iota` pattern gives you bitmasks, and pairing any `iota` type with the `stringer` tool gives you human-readable logging at zero maintenance cost. The one discipline required: never rely on iota ordering for values that live outside your process. For in-memory state machines, workflow states, and feature flags, `iota` is exactly the right tool.
+
+---
+
+← [Lesson 12: Value vs Pointer Receivers](/post/go/go-idioms-value-vs-pointer-receivers) | [Course Index](#) | [Lesson 14: context.Context](/post/go/go-idioms-context) →

@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: internal Package Is Underrated'
+title: 'Lesson 20: internal Package Is Underrated — Compiler-enforced privacy for free'
 author: Atharva Pandey
 keywords:
   - Go
@@ -13,58 +13,22 @@ tags:
   - Go tutorial
   - golang
 date: '2025-09-08T00:00:00.000Z'
+series: "Idiomatic Go"
+lesson: 20
 ---
-s exported; if it doesn't, it's only accessible within the same package. What many developers don't reach for often enough is the `internal` directory, which gives you a third option: accessible within your module (or a specific subtree), but not to outside importers. The compiler enforces it, not documentation or convention.
 
-This matters more than it sounds. Exported symbols are API commitments. The `internal` package lets you share code across multiple packages in your own codebase without accidentally publishing an API surface you'll have to maintain forever.
+Go has two visibility levels: exported (starts with a capital letter) and unexported (doesn't). Most engineers use only these two. But there's a third option that the language gives you for free, and it's more useful than most people realize. The `internal` directory enforces that certain packages can only be imported by code within your own module — and the compiler, not documentation or convention, does the enforcing.
 
-## How internal Works
+Exported symbols are API commitments. Once something is exported and external code is depending on it, changing it is a breaking change. The `internal` package is the escape hatch: share code across multiple packages in your own codebase without accidentally publishing an API surface you'll have to maintain forever.
 
-The rule is simple: a package path containing an `internal` directory can only be imported by code rooted at the parent of the `internal` directory.
+## The Problem
 
-Given this layout:
+Without `internal`, you have two options when you need to share code across packages in your module:
 
-```
-mymodule/
-├── internal/
-│   └── auth/
-│       └── token.go
-├── server/
-│   └── handler.go
-└── client/
-    └── client.go
-```
+1. Export it. Now it's public API. External packages can import and depend on it. Changing field names, function signatures, or the package path becomes a breaking change.
+2. Duplicate it. Maintenance hell.
 
-`server/handler.go` and `client/client.go` can both import `mymodule/internal/auth`. But if you have a separate module — say `myothertool` — and it tries to import `mymodule/internal/auth`, the Go compiler refuses:
-
-```
-imports mymodule/internal/auth: use of internal package not allowed
-```
-
-This enforcement is at compile time, not runtime. No `go build` flag to override it. No workaround other than restructuring.
-
-The `internal` directory can appear anywhere in a package path, not just at the top level:
-
-```
-mymodule/
-└── cmd/
-    └── server/
-        ├── internal/
-        │   └── config/
-        │       └── config.go
-        └── main.go
-```
-
-Here, `mymodule/cmd/server/internal/config` can only be imported by code under `mymodule/cmd/server/`. Even other packages in `mymodule` can't import it.
-
-## Why You Should Use It More
-
-Here's the problem internal solves. You're building a package, say `github.com/yourorg/yourpkg`. You have helper code — shared types, utility functions — that you need in multiple internal packages. Without `internal`, you have two bad options:
-
-1. Export those helpers. Now they're public API. Users will import and depend on them. Changing them becomes a breaking change.
-2. Duplicate the code across packages. Now you have maintenance hell.
-
-`internal` gives you a third way:
+Here's the first option playing out:
 
 ```go
 // WRONG — exporting utility types that should be internal
@@ -79,7 +43,28 @@ type TokenPayload struct {
 }
 ```
 
-Once this is exported, external packages can import it. If you change the field names or the package path, you break their code. You've accidentally published an API.
+Once this is out there, external packages import it. If you change the field names or restructure the package, you break their code. You've accidentally published an API by doing nothing other than using the only tool you thought you had.
+
+The same problem appears in SDKs and libraries:
+
+```go
+// WRONG — this is now public API even though it's an implementation detail
+// github.com/yourorg/sdk/httputil/request.go
+package httputil
+
+// RetryState tracks retry attempts — not intended for external use
+type RetryState struct {
+    Attempts  int
+    LastError error
+    Backoff   time.Duration
+}
+```
+
+External packages can now import and use `RetryState`. In v2, you need to either version your module or accept a breaking change.
+
+## The Idiomatic Way
+
+Move implementation-only types and functions into an `internal` directory. The rule is simple: a package path containing `internal` can only be imported by code rooted at the parent of that `internal` directory.
 
 ```go
 // RIGHT — internal keeps it private to your module
@@ -93,132 +78,70 @@ type Payload struct {
 }
 
 func Parse(raw string) (Payload, error) {
-    // ... JWT parsing logic
+    // JWT parsing logic
 }
 ```
 
-Now `Payload` and `Parse` can be used freely by any package in `github.com/yourorg/yourpkg`, but they're invisible to external importers. You can refactor, rename, or restructure them without worrying about breaking downstream users.
+`Payload` and `Parse` are freely usable anywhere in `github.com/yourorg/yourpkg`, but invisible to external importers. Refactor, rename, restructure — no downstream breakage possible.
 
-## Structuring a Real Project with internal
+If another module tries to import it:
 
-A mature Go project typically looks something like this:
+```
+imports mymodule/internal/auth: use of internal package not allowed
+```
+
+Compile-time. No flag to override it. No workaround other than restructuring.
+
+A mature project layout using `internal`:
 
 ```
 myapp/
 ├── cmd/
 │   ├── server/
-│   │   └── main.go          # binary entry point
+│   │   └── main.go
 │   └── worker/
-│       └── main.go          # another binary
+│       └── main.go
 ├── internal/
 │   ├── auth/
 │   │   ├── auth.go
 │   │   └── auth_test.go
 │   ├── database/
-│   │   ├── db.go
-│   │   └── migrations/
+│   │   └── db.go
 │   ├── middleware/
 │   │   └── middleware.go
 │   └── config/
 │       └── config.go
 ├── pkg/
-│   └── apiclient/           # intended for external use
+│   └── apiclient/   # deliberately exposed to external importers
 │       └── client.go
 └── go.mod
 ```
 
-The layout convention: `cmd/` holds binary entry points, `internal/` holds everything that's implementation detail, `pkg/` holds what you deliberately expose to external importers.
+The `cmd/` packages are entry points. `internal/` is everything that's implementation detail. `pkg/` is what you deliberately expose. Everything in `internal/` is freely shareable within `myapp` but completely opaque to external code.
 
-The `cmd/server/main.go` wires it all together:
+## In The Wild
 
-```go
-package main
+The `internal` directory can appear anywhere in a package path, not just at the top level. This gives you nested privacy — package-private visibility within a specific subtree.
 
-import (
-    "myapp/internal/auth"
-    "myapp/internal/config"
-    "myapp/internal/database"
-    "myapp/internal/middleware"
-)
-
-func main() {
-    cfg := config.Load()
-    db := database.Connect(cfg.DatabaseURL)
-    authSvc := auth.NewService(db, cfg.JWTSecret)
-
-    mux := http.NewServeMux()
-    mux.Handle("/api/", middleware.Auth(authSvc, apiHandler(db)))
-
-    http.ListenAndServe(cfg.Addr, mux)
-}
-```
-
-Everything in `internal/` is freely shareable within `myapp`, but completely opaque to external code. If someone vendors your module or imports your `pkg/apiclient`, they can't accidentally (or deliberately) reach into your internals.
-
-## Preventing Accidental API Surface Leaks
-
-The `internal` package is especially useful when your codebase is a library or SDK that other teams or external users import. Without it, any exported type becomes part of your public API surface, even if you only exported it to share it across two internal packages.
-
-```go
-// WRONG — this is now public API even though it's an implementation detail
-// github.com/yourorg/sdk/httputil/request.go
-package httputil
-
-// RetryState tracks retry attempts — not intended for public use
-type RetryState struct {
-    Attempts  int
-    LastError error
-    Backoff   time.Duration
-}
-```
-
-External packages can now import and use `RetryState`. If you want to change its fields in v2, you need to either version your module or accept a breaking change.
-
-```go
-// RIGHT — move it to internal
-// github.com/yourorg/sdk/internal/retry/state.go
-package retry
-
-type State struct {
-    Attempts  int
-    LastError error
-    Backoff   time.Duration
-}
-```
-
-Now `State` is freely usable within `github.com/yourorg/sdk`, but external packages can't import it. You can change it however you want without it being a breaking API change.
-
-## Refactoring a Package: A Concrete Example
-
-Suppose you have an `auth` package that's grown too large. It handles token generation, user lookup, and session management all in one file. You want to split it but keep the public API stable.
-
-Before refactoring:
+Suppose your `auth` package has grown large and you want to split it without changing the public API:
 
 ```
 internal/
 └── auth/
-    └── auth.go  # 600 lines doing everything
-```
-
-After:
-
-```
-internal/
-└── auth/
-    ├── auth.go          # public-facing functions and types
+    ├── auth.go           # public-facing functions and types
     ├── internal/
     │   ├── token/
-    │   │   └── token.go   # JWT generation/parsing
+    │   │   └── token.go  # JWT generation/parsing
     │   ├── session/
-    │   │   └── session.go # session store operations
+    │   │   └── session.go
     │   └── lookup/
-    │       └── lookup.go  # user lookup and caching
+    │       └── lookup.go
     └── auth_test.go
 ```
 
-Yes, `internal` directories can be nested. `auth/internal/token` is only accessible from within `auth/` — not even other packages in your top-level `internal/` can reach it. This gives you package-private visibility: implementation details of `auth` that even your own other packages shouldn't depend on.
+`auth/internal/token` is only accessible from within `auth/`. Even other packages in your top-level `internal/` can't reach it. This is implementation detail of `auth` that even your own other packages shouldn't depend on.
 
-The `auth.go` file becomes thin — just the public interface that delegates to the internal packages:
+The public `auth.go` becomes thin — just the interface that delegates to the internal packages:
 
 ```go
 package auth
@@ -233,14 +156,6 @@ type Service struct {
     tokens   *token.Generator
     sessions *session.Store
     users    *lookup.Cache
-}
-
-func NewService(db *sql.DB, secret string) *Service {
-    return &Service{
-        tokens:   token.NewGenerator(secret),
-        sessions: session.NewStore(db),
-        users:    lookup.NewCache(db),
-    }
 }
 
 func (s *Service) Login(username, password string) (string, error) {
@@ -259,18 +174,20 @@ func (s *Service) Login(username, password string) (string, error) {
 }
 ```
 
-The public API of `auth` didn't change — `Service`, `NewService`, and `Login` are still there. But the implementation is now cleanly split into focused packages, none of which are accessible to callers of `auth`.
+The public API of `auth` didn't change. The implementation is now split into focused, private sub-packages. No external breakage, clean internals.
 
-## When to Use internal
+## The Gotchas
 
-Not everything needs to be in `internal`. Here's the decision:
+**Putting too little in `internal`.** The default should be `internal`. If you're writing an application (not a library), almost everything except the `cmd/` entry points belongs in `internal/`. Don't wait until you have a problem to start using it — use it from day one and export deliberately rather than accidentally.
 
-- Code shared only within your module, not intended as public API → `internal`
-- Code you want to make available to external importers → exported package outside `internal`
-- Code used only within a single package → unexported identifiers in that package
+**Forgetting that `internal` can be nested.** A `cmd/server/internal/config` package is only accessible from `cmd/server/`. If you mean to share that config across the whole module, it needs to be at `internal/config` at the module root. The placement determines the scope of access, so be intentional about where you put the `internal` directory.
 
-If you're writing an application (not a library), put almost everything in `internal/`. Your `cmd/` packages are entry points; your `internal/` packages are the program. Anything you don't explicitly intend to expose should be in `internal/` by default.
+**Confusing `internal` with unexported identifiers.** Unexported identifiers are invisible outside their package. `internal` packages are invisible outside their parent subtree but can export identifiers freely. They solve different problems: unexported is for package-level privacy, `internal` is for module-level privacy of entire packages.
 
-If you're writing a library, `internal/` is where your implementation lives. Your `pkg/` or top-level packages are your public API. The internal/external boundary is the same as the "things I'll maintain as stable API" boundary.
+## Key Takeaway
 
-The `internal` package is enforced by the compiler, documented by the directory structure, and costs nothing. Use it. Your future self — and any external users of your code — will thank you for having clear boundaries from day one.
+The `internal` package is enforced by the compiler, documented by the directory structure, and costs nothing to use. It gives you a vocabulary of three visibility levels — package-private (unexported), module-private (`internal`), and public (exported outside `internal`) — instead of just two. I've seen codebases where every helper type ended up accidentally exported because engineers didn't know they had a better option. Start every project with `internal/` as the default home for implementation code. Export only what you deliberately intend to be part of your public interface. The boundary between "things I'll maintain as stable API" and "implementation detail" should be visible in the directory structure, not buried in comments.
+
+---
+
+← [Previous: Table-Driven Tests](/post/go/go-idioms-table-driven-tests) | [Course Index](/post/go/) | [Next: Composition Over Inheritance](/post/go/go-idioms-composition) →

@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: context.Context'
+title: 'Lesson 14: context.Context — The parameter every function should take first'
 author: Atharva Pandey
 keywords:
   - Go
@@ -14,52 +14,43 @@ tags:
   - Go tutorial
   - golang
 date: '2025-06-16T00:00:00.000Z'
+series: "Idiomatic Go"
+lesson: 14
 ---
-t wired it up yet
-ctx := context.TODO()
-```
 
-These two are functionally identical. The difference is semantic: `Background` is the intended long-term root; `TODO` is a marker that says "this code should have a real context eventually, but I'm adding one incrementally." You will see `context.TODO()` in codebases that were written before context was standard practice and are being migrated.
+Without `context.Context`, a function that makes a database call, fires an HTTP request, or runs a long computation has no way to be told to stop. The caller times out, the user closes the browser tab, the load balancer kills the connection — and your function keeps running, consuming CPU and holding database connections, doing work that nobody will ever see. `context.Context` is how Go solves this.
 
-Do not use `context.Background()` deep inside your call stack. Use it at entry points — the `main` function, test functions, and the first point where a request enters your system (like an HTTP handler). From there, derive child contexts as needed.
+## The Problem
 
-## WithCancel, WithTimeout, WithDeadline
-
-These three functions create child contexts with cancellation attached. They all return a context and a cancel function. Always defer the cancel function — calling it releases resources even if the context has not yet been used.
-
-```go
-// WithCancel — cancel manually
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel() // always defer this
-
-// WithTimeout — cancel after a duration
-ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-defer cancel()
-
-// WithDeadline — cancel at a specific time
-deadline := time.Now().Add(5 * time.Second)
-ctx, cancel := context.WithDeadline(context.Background(), deadline)
-defer cancel()
-```
-
-`WithTimeout` is shorthand for `WithDeadline(parent, time.Now().Add(d))`. Use `WithTimeout` when you are thinking in durations ("this database call should finish in 2 seconds"), and `WithDeadline` when you have an absolute time ("this batch job must finish before midnight").
-
-Here is a realistic example — a database call with a timeout:
+A function with no context cannot be cancelled. It runs until it finishes, or until the process dies. In an HTTP server handling hundreds of requests per second, this accumulates fast:
 
 ```go
 // WRONG — no timeout, query can hang forever
 func getUserByID(db *sql.DB, userID string) (*User, error) {
     row := db.QueryRow("SELECT id, name, email FROM users WHERE id = $1", userID)
-    // ...
+    var u User
+    if err := row.Scan(&u.ID, &u.Name, &u.Email); err != nil {
+        return nil, err
+    }
+    return &u, nil
 }
+```
 
-// RIGHT — context with timeout propagated through the call
+If the database is slow or unreachable, this call blocks the goroutine serving the request. Goroutines pile up. Memory climbs. The whole service degrades.
+
+The context-less signature also fails to compose. If a calling function has a 500ms deadline and this function takes 2 seconds, there is no way to propagate that constraint inward. Every layer has to set its own independent timeout, they don't compose, and you end up with a system that can technically time out at each layer but never actually cancels in-flight work.
+
+## The Idiomatic Way
+
+Accept `context.Context` as the first parameter, named `ctx`. Always. Pass it to every function that does I/O. Derive child contexts when you need to add tighter deadlines.
+
+```go
+// RIGHT — context propagates cancellation and deadlines
 func getUserByID(ctx context.Context, db *sql.DB, userID string) (*User, error) {
     queryCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
     defer cancel()
 
     row := db.QueryRowContext(queryCtx, "SELECT id, name, email FROM users WHERE id = $1", userID)
-
     var u User
     if err := row.Scan(&u.ID, &u.Name, &u.Email); err != nil {
         if errors.Is(err, context.DeadlineExceeded) {
@@ -71,54 +62,33 @@ func getUserByID(ctx context.Context, db *sql.DB, userID string) (*User, error) 
 }
 ```
 
-Notice that the function accepts a `ctx context.Context` from the caller. The caller's context may already have a deadline shorter than 2 seconds — in that case, the `WithTimeout` call does not override it. A child context can only be more restrictive than its parent, never more permissive. If the parent has 500ms left, your 2-second timeout does not extend it.
+A child context can only be more restrictive than its parent — never more permissive. If the caller's context has 300ms remaining and you create a 2-second child context, the child still expires at 300ms. Deadlines propagate downward automatically.
 
-## Context as the First Parameter
-
-This is a Go convention that is very close to a rule: if a function accepts a context, it should be the first parameter, named `ctx`:
+At the top of the call stack, create a root context with `context.Background()`:
 
 ```go
-// WRONG — context buried in the middle or last
-func fetchData(userID string, ctx context.Context, options FetchOptions) ([]byte, error)
+// Entry points: main, test functions, HTTP handlers, message queue consumers
+ctx := context.Background()
 
-// WRONG — context on the struct instead of the function
+// Add a deadline for the entire handler
+ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+defer cancel()
+```
+
+Never store a context in a struct. Contexts are request-scoped — they represent one operation's lifetime. A struct that holds a database connection is long-lived. Mixing those lifetimes causes subtle bugs where a cancelled context leaks into unrelated work:
+
+```go
+// WRONG — context on the struct
 type Service struct {
     ctx context.Context // don't do this
     db  *sql.DB
 }
 
-// RIGHT — context is first, named ctx
-func fetchData(ctx context.Context, userID string, options FetchOptions) ([]byte, error)
+// RIGHT — context as a parameter
+func (s *Service) GetUser(ctx context.Context, id string) (*User, error)
 ```
 
-Storing a context on a struct is a specific antipattern that the Go documentation explicitly calls out. Contexts are request-scoped — they represent the lifetime of one operation. A struct that stores a database connection or a logger represents a long-lived service. Those two lifetimes should not be mixed. When you need a context, accept it as a parameter.
-
-## The Done() Channel Pattern
-
-Contexts signal cancellation through a channel returned by `ctx.Done()`. When the context is cancelled (by a cancel call, timeout, or deadline), the channel is closed. Closed channels can be selected on and received from indefinitely, which makes them perfect for signaling:
-
-```go
-func processItems(ctx context.Context, items []Item) error {
-    for _, item := range items {
-        // Check for cancellation before each unit of work
-        select {
-        case <-ctx.Done():
-            return ctx.Err() // context.Canceled or context.DeadlineExceeded
-        default:
-            // continue processing
-        }
-
-        if err := processItem(ctx, item); err != nil {
-            return err
-        }
-    }
-    return nil
-}
-```
-
-The `select` with a `default` case is non-blocking. It checks if the context is done; if it is, it returns immediately. If not, it falls through to the default and continues. Use this at the top of loops that might run for a long time.
-
-For goroutines, the pattern looks like this:
+For goroutines that need to stop when cancelled, check `ctx.Done()` in your select:
 
 ```go
 func startWorker(ctx context.Context, work <-chan Task) {
@@ -130,111 +100,72 @@ func startWorker(ctx context.Context, work <-chan Task) {
             }
             processTask(ctx, task)
         case <-ctx.Done():
-            return // context cancelled, stop the worker
+            return // context cancelled — stop the worker
         }
     }
 }
 ```
 
-This is how you prevent goroutine leaks. Without the `ctx.Done()` case, if the context is cancelled, the goroutine blocks on `<-work` forever. With it, the goroutine stops cleanly when the context is done.
+Without the `ctx.Done()` case, a goroutine blocked on `<-work` will never exit when the context is cancelled. That's a goroutine leak.
 
-## Cancellation Propagation in HTTP Servers
+## In The Wild
 
-The Go HTTP server automatically cancels the request context when the client disconnects. This means if you propagate the request context through your call stack, all the downstream work will be cancelled automatically:
+In an HTTP handler, the request context is already wired to client disconnection:
 
 ```go
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    ctx := r.Context() // already has cancellation tied to the HTTP request
-
-    // Add a deadline for the entire handler
+    ctx := r.Context() // cancelled automatically when client disconnects
     ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
     defer cancel()
 
     user, err := h.userService.GetUser(ctx, r.PathValue("id"))
     if err != nil {
         if errors.Is(err, context.Canceled) {
-            // Client disconnected — no need to write a response
-            return
+            return // client disconnected, no response needed
         }
         http.Error(w, "internal error", http.StatusInternalServerError)
         return
     }
 
-    // Fetch recommendations in parallel
     recCtx, recCancel := context.WithTimeout(ctx, 3*time.Second)
     defer recCancel()
 
     recs, err := h.recService.GetRecommendations(recCtx, user.ID)
     if err != nil {
-        // Recommendation failure is non-fatal — serve the user without recs
-        recs = nil
+        recs = nil // non-fatal, serve user without recommendations
     }
 
     json.NewEncoder(w).Encode(buildResponse(user, recs))
 }
 ```
 
-If the client closes the browser tab mid-request, `r.Context()` gets cancelled. That cancellation propagates to `ctx`, which propagates to every `QueryRowContext`, `http.NewRequestWithContext`, and downstream `select { case <-ctx.Done() }` in your entire call chain. Expensive work stops. Resources are released.
+When a user closes the browser tab mid-request, `r.Context()` is cancelled. That cancellation propagates into `GetUser`, into `GetRecommendations`, into every `QueryRowContext` in the entire call chain. Expensive work stops. Database connections are returned to the pool. This is the whole point.
 
-## context.Value — Use Sparingly
+## The Gotchas
 
-Contexts can carry request-scoped values via `context.WithValue`. This is useful for things like request IDs and authenticated user identifiers — data that is relevant throughout the call stack for a single request but that you do not want to thread through every function signature.
+**Always defer cancel.** Every `context.WithCancel`, `context.WithTimeout`, and `context.WithDeadline` returns a cancel function. If you don't call it, the context and its resources leak until the parent context is cancelled. Always:
+
+```go
+ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+defer cancel() // this line is not optional
+```
+
+**`context.Value` is not a general-purpose bag.** Contexts can carry values via `context.WithValue`, which is useful for request IDs, trace IDs, and authenticated principals. It's not for business logic data or database results. Values bypass the type system (you extract them with type assertions), and any function in the call chain can accidentally overwrite a key. Use unexported custom types as keys to prevent collisions between packages:
 
 ```go
 type contextKey string
-
 const requestIDKey contextKey = "requestID"
 
-// Setting a value
-func withRequestID(ctx context.Context, id string) context.Context {
-    return context.WithValue(ctx, requestIDKey, id)
-}
-
-// Reading a value
-func getRequestID(ctx context.Context) string {
-    id, ok := ctx.Value(requestIDKey).(string)
-    if !ok {
-        return ""
-    }
-    return id
-}
+// This key is unique to this package — no collision with other packages
+ctx = context.WithValue(ctx, requestIDKey, id)
 ```
 
-Use an unexported custom type for your context keys, never a string or built-in type directly. If two packages both use the string `"userID"` as a key, they will collide. A `contextKey` type defined in your package is unique.
+**`context.TODO()` vs `context.Background()`.** They're functionally identical. `TODO` is a marker meaning "this should have a real context eventually." Use `Background()` for intentional long-lived roots; use `TODO()` when you're migrating old code incrementally and haven't wired up a real context yet. If you see `TODO()` deep in a call stack, that's a todo worth addressing.
 
-The caution: context values are not typed until you extract them with a type assertion. They bypass the compiler's type system. Do not use `context.Value` for data that is required for core business logic — use function parameters for that. Reserve `context.Value` for cross-cutting concerns: request IDs, trace IDs, authenticated principals, feature flags for the request. If you find yourself putting database results or computed values into the context, step back and reconsider.
+## Key Takeaway
 
-## The Shape of a Well-Contextual API
+`context.Context` as the first parameter is not a suggestion in Go — it's how the entire standard library and every serious production service is written. The payoff is real: cancellations propagate automatically through your entire call stack, timeouts compose correctly, and client disconnections stop work that would otherwise run to completion for no reason. Thread context through every function that does I/O from day one. Retrofitting it later is tedious, and every day you don't have it is a day your service is doing unnecessary work.
 
-After all this, here is what a function that uses context correctly looks like:
+---
 
-```go
-// Context first, all other params after, returns error as last value
-func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []OrderItem) (*Order, error) {
-    // Respect incoming deadline, add own if needed
-    ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-    defer cancel()
-
-    // Pass context to all I/O operations
-    user, err := s.users.GetUser(ctx, userID)
-    if err != nil {
-        return nil, fmt.Errorf("fetching user: %w", err)
-    }
-
-    order, err := s.orders.Insert(ctx, user.ID, items)
-    if err != nil {
-        return nil, fmt.Errorf("inserting order: %w", err)
-    }
-
-    // Pass context to downstream services
-    if err := s.inventory.Reserve(ctx, items); err != nil {
-        return nil, fmt.Errorf("reserving inventory: %w", err)
-    }
-
-    return order, nil
-}
-```
-
-Context as first parameter. Derive a child context when you need to add a timeout. Pass it to every function that does I/O. Check `ctx.Err()` or use `errors.Is(err, context.DeadlineExceeded)` to handle cancellations gracefully.
-
-This is the pattern the entire standard library and every well-written Go service follows. Once it is in your muscle memory, you will never want to write blocking code without it again.
+← [Lesson 13: iota for Enums](/post/go/go-idioms-iota-enums) | [Course Index](#) | [Lesson 15: Goroutines Are Cheap, Not Free](/post/go/go-idioms-goroutines-cheap-not-free) →

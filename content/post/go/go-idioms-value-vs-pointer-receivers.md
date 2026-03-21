@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: Value vs Pointer Receivers'
+title: 'Lesson 12: Value vs Pointer Receivers — The method that silently does nothing'
 author: Atharva Pandey
 keywords:
   - Go
@@ -12,139 +12,94 @@ tags:
   - Go tutorial
   - golang
 date: '2026-02-23T00:00:00.000Z'
+series: "Idiomatic Go"
+lesson: 12
 ---
-"(%g, %g)", p.X, p.Y)
+
+Value vs pointer receivers is one of those topics that seems like a style preference until it silently breaks your program. The tell is a method that looks like it mutates a struct, compiles without complaint, but the mutations simply don't persist. You add a log line, the value is right inside the method — and wrong the moment the method returns.
+
+## The Problem
+
+A value receiver operates on a copy. Every time you call the method, Go copies the entire struct and passes the copy to the method. Mutations happen on the copy, which gets discarded when the method returns. The original is untouched.
+
+```go
+type Counter struct {
+    count int
+}
+
+// WRONG — value receiver, operates on a copy
+func (c Counter) Increment() {
+    c.count++ // increments the copy, not the original
+}
+
+func main() {
+    c := Counter{}
+    c.Increment()
+    c.Increment()
+    fmt.Println(c.count) // 0 — both increments were lost
 }
 ```
 
-Here, working with a copy is correct behavior. You do not want `Distance` or `String` to be able to modify the point — the value receiver enforces that at the type system level.
+There is no compiler warning. The code runs. The counter just never moves. This is the kind of bug that takes twenty minutes to find the first time you encounter it, and two seconds every time after.
 
-## Method Sets and Interface Satisfaction — Where It Gets Serious
-
-This is where the pointer/value distinction stops being a style choice and starts being a correctness issue.
-
-In Go, a pointer type `*T` has all the methods of both `T` and `*T`. A value type `T` only has the methods defined with value receivers. This matters enormously when satisfying interfaces:
+The interface satisfaction version is worse because it doesn't compile but the error message is cryptic:
 
 ```go
 type Stringer interface {
     String() string
 }
 
-type Person struct {
-    Name string
-}
+type Person struct{ Name string }
 
-// Pointer receiver on String
-func (p *Person) String() string {
-    return p.Name
-}
+func (p *Person) String() string { return p.Name }
 
 func main() {
     p := Person{Name: "Alice"}
-
-    // WRONG — this does not compile
-    // var s Stringer = p // cannot use p (type Person) as type Stringer
-    // Person does not implement Stringer (String method has pointer receiver)
-
-    // RIGHT
-    var s Stringer = &p // *Person implements Stringer
-    fmt.Println(s.String())
+    var s Stringer = p  // compile error: Person does not implement Stringer
+                        // (String method has pointer receiver)
 }
 ```
 
-The compiler error message is clear but can feel confusing the first time you see it. The fix is always the same: pass a pointer.
+The fix is `&p`. But if you don't understand why, you'll be confused every time this surfaces.
 
-Here is a more realistic example with `http.Handler`:
+## The Idiomatic Way
+
+Use a pointer receiver when the method needs to mutate the receiver, when the struct contains non-copyable types (mutexes, connections), or when the struct is large enough that copying it repeatedly is wasteful. That covers the vast majority of struct methods you'll write.
 
 ```go
-type MyHandler struct {
-    db     *sql.DB
-    logger *log.Logger
+// RIGHT — pointer receiver, mutates the original
+func (c *Counter) Increment() {
+    c.count++
 }
 
-// WRONG — value receiver
-func (h MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    // This works, but h is a copy
-    // If ServeHTTP stores anything on h, it will be lost
-    // Also, copying a sql.DB or logger is wrong
-}
-
-// RIGHT — pointer receiver
-func (h *MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    // Works on the original, no copying of db or logger
+func (c *Counter) Value() int {
+    return c.count
 }
 
 func main() {
-    h := &MyHandler{
-        db:     openDB(),
-        logger: log.New(os.Stdout, "", log.LstdFlags),
-    }
-
-    // http.Handle expects an http.Handler interface
-    // *MyHandler satisfies it because ServeHTTP is on *MyHandler
-    http.Handle("/", h)
+    c := Counter{}
+    c.Increment()
+    c.Increment()
+    fmt.Println(c.Value()) // 2 — correct
 }
 ```
 
-## Do Not Mix Receiver Types on the Same Type
-
-Go allows you to define some methods with value receivers and some with pointer receivers on the same type. The compiler will not stop you. But this is almost always a mistake:
+For types that contain non-copyable fields, a pointer receiver isn't just idiomatic — it's mandatory:
 
 ```go
-type Session struct {
-    ID    string
-    token string
-}
-
-// WRONG — mixing receiver types is confusing and creates asymmetric method sets
-func (s Session) GetID() string {
-    return s.ID
-}
-
-func (s *Session) Refresh() {
-    s.token = generateToken()
-}
-```
-
-The problem is that `Session` (value type) has `GetID` in its method set but not `Refresh`. Only `*Session` has both. This asymmetry creates surprises when you try to use `Session` as an interface — you have to remember which methods are on the pointer type vs the value type.
-
-The rule: once a type has any pointer receiver methods, all methods should use pointer receivers. Make the type consistently "pointer-based".
-
-```go
-// RIGHT — consistent pointer receivers
-func (s *Session) GetID() string {
-    return s.ID
-}
-
-func (s *Session) Refresh() {
-    s.token = generateToken()
-}
-```
-
-## The Three Rules for Choosing
-
-When deciding on receiver type, apply these rules in order:
-
-**Rule 1: Does the method need to mutate the receiver?**
-Use a pointer receiver. No exceptions.
-
-**Rule 2: Does the struct contain a field that should not be copied?**
-Use a pointer receiver. This includes `sync.Mutex`, `sync.WaitGroup`, database connections, file handles, and any type whose documentation says "do not copy." Copying a mutex defeats its purpose entirely.
-
-```go
-// WRONG — copying a mutex
 type Cache struct {
     mu   sync.Mutex
     data map[string]string
 }
 
-func (c Cache) Get(key string) string { // copies Cache, copies the mutex — wrong
+// WRONG — copying Cache copies the mutex, which the sync package explicitly forbids
+func (c Cache) Get(key string) string {
     c.mu.Lock()
     defer c.mu.Unlock()
     return c.data[key]
 }
 
-// RIGHT
+// RIGHT — pointer receiver avoids the copy
 func (c *Cache) Get(key string) string {
     c.mu.Lock()
     defer c.mu.Unlock()
@@ -152,36 +107,76 @@ func (c *Cache) Get(key string) string {
 }
 ```
 
-**Rule 3: Is the struct large?**
-Use a pointer receiver. Copying a 500-byte struct on every method call adds up. There is no hard cutoff, but anything beyond a few fields with basic types should be a pointer receiver.
+Once any method on a type uses a pointer receiver, make all methods pointer receivers. Mixing them creates an asymmetric method set — `*Session` has all methods, but `Session` only has the value-receiver ones. That asymmetry causes interface satisfaction surprises:
 
-If none of these rules apply — the method is read-only, the struct is small, there are no non-copyable fields — a value receiver is fine. Small value types like `time.Time`, `net.IP`, and `image.Point` use value receivers throughout the standard library.
+```go
+// WRONG — mixed receivers
+type Session struct{ ID, token string }
 
-## Auto-Addressable Values Don't Bail You Out at Interface Boundaries
+func (s Session) GetID() string { return s.ID }   // value receiver
+func (s *Session) Refresh() { s.token = "new" }  // pointer receiver
 
-One last thing worth being explicit about. Go is helpful at direct method call sites:
+// Session only has GetID in its method set
+// *Session has both GetID and Refresh
+
+// RIGHT — consistent pointer receivers
+func (s *Session) GetID() string { return s.ID }
+func (s *Session) Refresh()      { s.token = "new" }
+```
+
+Value receivers make sense for small, purely read-only types — think `time.Time`, `net.IP`, a custom `Color` type. If the type is designed to be passed by value and never mutated through a method, value receivers are intentional. For everything else, default to pointer receivers.
+
+## In The Wild
+
+The most common place I've seen this go wrong in production is HTTP handlers. Someone writes a handler struct with value receivers, registers it with `http.Handle("/", handler)` (passing a value), and then wonders why the request count field stays at zero or why the database query returns stale cached data.
+
+```go
+type MyHandler struct {
+    db     *sql.DB
+    logger *log.Logger
+}
+
+// WRONG — copies db and logger on every request
+func (h MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    // h.db and h.logger are copies — also, sql.DB explicitly says don't copy
+}
+
+// RIGHT
+func (h *MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    // operates on the original handler, db and logger are not copied
+}
+
+func main() {
+    h := &MyHandler{db: openDB(), logger: log.New(os.Stdout, "", log.LstdFlags)}
+    http.Handle("/", h) // *MyHandler satisfies http.Handler
+}
+```
+
+## The Gotchas
+
+**Auto-addressability at call sites doesn't help you at interface boundaries.** Go will automatically take the address of an addressable value when you call a pointer-receiver method directly:
 
 ```go
 c := Counter{count: 0}
-c.Increment() // Go auto-takes the address: (&c).Increment()
+c.Increment() // Go does (&c).Increment() — works fine
 ```
 
-This works and the language spec guarantees it for addressable values. But it does not work when you are assigning to an interface:
+But that trick evaporates the moment you assign to an interface:
 
 ```go
-var c Counter
-c.Increment()         // fine — Go handles this at the call site
-_ = c.count           // 1, correct
-
-var s fmt.Stringer = c // if String() is on *Counter, this fails to compile
+var s fmt.Stringer = c // if String() is on *Counter, this does NOT compile
 ```
 
-The auto-address trick is only available at direct call sites. The moment you assign to an interface, the method set rules apply strictly. This catches people out regularly — they test methods directly, everything works, then they try to pass the value to a function that expects an interface and the compiler refuses.
+Test your methods directly and everything looks fine. Try to pass the value to a function expecting an interface and the compiler refuses. The fix is always to pass a pointer.
 
-The fix is always to pass a pointer: `var s fmt.Stringer = &c`.
+**Embedding a type with pointer receivers.** If you embed a type that has pointer receivers, the embedding struct must be used as a pointer if you want the embedded methods in its method set. Forgetting this causes the same interface satisfaction failures with a more confusing error trail.
 
-## Putting It Together
+**Copying a mutex panics under the race detector.** Go's race detector will flag a copied mutex at runtime. If you're passing a struct with a `sync.Mutex` field by value to a function, `go test -race` will catch it. Don't wait for the race detector — just use pointer receivers when your struct has a mutex.
 
-Pointer receivers are the default for almost every struct type you define. Value receivers are appropriate for small, purely immutable types. When in doubt, use a pointer receiver — it is safer, it avoids surprises with interface satisfaction, and it prevents accidental copying of types that should not be copied.
+## Key Takeaway
 
-The one situation where you want to be thoughtful about it is small value types designed to be passed around by value — think `net.IP` or a custom `Color` type. For those, value receivers are intentional. For everything else, pointer receivers keep your code predictable.
+Pointer receivers are the right default for almost every struct type. They prevent the "mutates a copy" bug, they satisfy interfaces correctly, and they avoid accidentally copying non-copyable types like mutexes and database connections. Reserve value receivers for small, immutable value types — the `net.IP` and `time.Time` tier of types that are explicitly designed to be passed by value. When in doubt, use a pointer receiver. The compiler will tell you if you're doing something wrong, but it won't tell you that your value receiver silently threw away your mutation.
+
+---
+
+← [Lesson 11: Nil Slice vs Empty Slice](/post/go/go-idioms-nil-vs-empty-slice) | [Course Index](#) | [Lesson 13: iota for Enums](/post/go/go-idioms-iota-enums) →

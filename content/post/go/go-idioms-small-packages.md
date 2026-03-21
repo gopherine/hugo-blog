@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: Small Packages Win'
+title: 'Lesson 22: Small Packages Win — One package, one job'
 author: Atharva Pandey
 keywords:
   - Go
@@ -12,15 +12,18 @@ keywords:
 tags:
   - Go tutorial
   - golang
+series: "Idiomatic Go"
+lesson: 22
 date: '2026-01-26T00:00:00.000Z'
 ---
-s a particular kind of Go codebase that's immediately recognizable as written by someone still thinking in another language. It has a `utils` package. Maybe a `common` package. Possibly a `helpers` folder with a file called `misc.go`. Every new function that doesn't obviously belong somewhere ends up there, and over time these packages become the junk drawers of the codebase — bloated, unfocused, and imported by everything.
+
+There is a particular kind of Go codebase that's immediately recognizable as written by someone still thinking in another language. It has a `utils` package. Maybe a `common` package. Possibly a `helpers` folder with a file called `misc.go`. Every function that doesn't obviously belong somewhere ends up there, and over time these packages become the junk drawers of the codebase — bloated, unfocused, and imported by everything.
 
 Go has a better way. Small packages with narrow responsibilities. One package, one idea.
 
-## The Problem with Catch-All Packages
+## The Problem
 
-The reason `utils` packages form is understandable: you're writing something and you need a helper function. You're not sure where it belongs, so you put it somewhere neutral. That's reasonable the first time. The problem is that it never stops there.
+The reason `utils` packages form is understandable: you need a helper function and you're not sure where it belongs, so you put it somewhere neutral. That's reasonable the first time. The problem is it never stops there.
 
 ```
 // WRONG — the utils anti-pattern
@@ -37,13 +40,27 @@ myapp/
 
 Now `utils` is imported by `models`, `handlers`, and everything else. It imports nothing specific itself, but it contains 40 functions that have nothing to do with each other. Adding one function to `utils` could subtly affect behavior elsewhere. Testing it requires loading everything. And when a new developer asks "where does the date formatting happen?", the answer is "utils, probably" — which isn't an answer at all.
 
+The same problem shows up in naming. If your package is called `userManager`, callers write `userManager.UserManager{}`. The package name and the type name repeat each other — Go calls this stuttering, and it's a sign the names haven't been thought through:
+
+```go
+// WRONG — verbose, redundant, stuttering names
+package userManager    // two words, camelCase
+
+import "myapp/userManager"
+u := userManager.UserManager{} // painful to read
+```
+
+## The Idiomatic Way
+
+Break your junk drawer into packages where each one has a name you can explain in a single sentence. Move functions to where they semantically belong:
+
 ```
 // RIGHT — focused packages with clear purpose
 myapp/
   currency/
     format.go    // formatAmount, parseCurrency
   timeutil/
-    parse.go     // parseDate, formatDate — named better than "utils"
+    parse.go     // parseDate, formatDate
   validate/
     email.go     // validateEmail
   retry/
@@ -52,53 +69,24 @@ myapp/
     api.go
 ```
 
-Each package has a reason to exist that you can explain in one sentence. When someone needs date formatting, they look in `timeutil`. The name tells you where to look.
+When someone needs date formatting, they look in `timeutil`. The name tells them where to look without consulting anyone.
 
-## Package Naming: Short, Lowercase, No Stuttering
-
-Go package names are short, lowercase, single words when possible. The name should describe what the package *provides*, not what it *is*.
-
-```go
-// WRONG — verbose, redundant, stuttering names
-package userManager    // two words, camelCase
-package httpHelpers    // unclear purpose
-package stringUtils    // the dreaded Utils
-
-import "myapp/userManager"
-u := userManager.UserManager{} // "userManager.UserManager" is painful to read
-```
+On naming: short, lowercase, single words. And apply the no-stutter rule — if your package is named `user`, don't name your types `UserProfile` or `UserService`. Just `Profile` and `Service`. The package name is the namespace.
 
 ```go
 // RIGHT — short, clear, no stutter
 package user
 
 import "myapp/user"
-u := user.Profile{}   // "user.Profile" reads naturally
+u := user.Profile{}   // reads naturally
 ```
 
-The "no stutter" rule is worth memorizing. If your package is named `user`, don't name your types `UserProfile` or `UserService`. Just `Profile` and `Service`. The package name provides the namespace — you don't need to repeat it inside the package.
+The standard library does this consistently. `http.Handler`, not `http.HTTPHandler`. `json.Encoder`, not `json.JSONEncoder`. `fmt.Println`, not `fmt.FmtPrintln`.
 
-The standard library demonstrates this consistently. The `http` package has `http.Handler`, not `http.HTTPHandler`. The `json` package has `json.Encoder`, not `json.JSONEncoder`. The `fmt` package has `fmt.Println`, not `fmt.FmtPrintln`.
-
-## The Standard Library as a Model
-
-Spend an afternoon reading the Go standard library's package structure. It's one of the best-designed package hierarchies in any language's standard library, and it's worth studying.
-
-`net/http` — HTTP client and server. One idea, well-executed.
-`encoding/json` — JSON encoding and decoding. Nothing else.
-`database/sql` — A database interface. Not a specific database driver, just the interface.
-`sync` — Synchronization primitives. Mutex, WaitGroup, Once.
-`io` — Basic I/O interfaces. Reader, Writer, Closer.
-`io/fs` — Filesystem abstractions. Separated from `io` because it's a distinct concept.
-
-Notice that when the standard library needs to split a concept, it puts the sub-concept in a sub-package. `io/fs` is not in `io` itself because it's a separate enough idea to deserve its own namespace. But it lives under `io` because it's related.
-
-## Avoiding Circular Imports
-
-Go refuses to compile circular imports. If package A imports package B, and package B imports package A, the compiler stops you with an error. This is not a limitation — it's a feature that forces you to think about your dependency graph.
+For circular imports, the compiler will refuse to compile them — and that's a feature. A circular dependency is almost always a design problem:
 
 ```go
-// WRONG — circular dependency
+// WRONG — circular dependency that won't compile
 // package user
 import "myapp/order"
 type User struct { Orders []order.Order }
@@ -106,74 +94,60 @@ type User struct { Orders []order.Order }
 // package order
 import "myapp/user"
 type Order struct { Buyer user.User }
-// This won't compile.
 ```
 
-The circular import here reveals a design problem: both packages know about each other, which means neither is truly focused. The fix is usually one of three things: extract the shared concept into a third package, use an interface instead of a concrete type, or merge the packages.
+The fix is usually one of three things: extract the shared concept into a third package, use an interface, or merge the packages. In this case, using shared IDs instead of embedding full types is often the cleanest path:
 
 ```go
-// RIGHT — shared types in a separate package, or use interfaces
-// package domain (shared types)
+// RIGHT — shared types in a separate package
+// package domain
 type UserID string
 type OrderID string
 
 // package user
 import "myapp/domain"
 type User struct {
-    ID     domain.UserID
-    Name   string
+    ID   domain.UserID
+    Name string
 }
 
 // package order
 import "myapp/domain"
 type Order struct {
-    ID     domain.OrderID
+    ID      domain.OrderID
     BuyerID domain.UserID  // reference by ID, not by embedding the full User
 }
 ```
 
 Now `user` and `order` both depend on `domain`, but not on each other. The dependency graph is a tree, not a cycle.
 
-## When to Split a Package
+## In The Wild
 
-Split a package when:
+The Go standard library is the best package design reference in any language's standard library. Spend an afternoon reading its structure:
 
-- It has grown large enough that the package documentation becomes a table of contents rather than a summary
-- It contains distinct concepts that are independently useful (someone might want one without the other)
-- Different parts have different testing needs or stability guarantees
-- Two distinct audiences use different parts of it
+- `net/http` — HTTP client and server. One idea, well-executed.
+- `encoding/json` — JSON encoding and decoding. Nothing else.
+- `database/sql` — A database interface. Not a specific driver, just the interface.
+- `sync` — Synchronization primitives. Mutex, WaitGroup, Once.
+- `io` — Basic I/O interfaces. Reader, Writer, Closer.
+- `io/fs` — Filesystem abstractions. Separated from `io` because it's a distinct concept.
 
-```go
-// A crypto package that handles both symmetric and asymmetric encryption
-// might be better split:
-crypto/aes/   — symmetric, used for data at rest
-crypto/rsa/   — asymmetric, used for key exchange
-```
+When the standard library needed to split a concept, it put the sub-concept in a sub-package. `io/fs` is not in `io` itself because it's a separate enough idea to deserve its own namespace. But it lives under `io` because it's related.
 
-The standard library did exactly this. Not everything lives in one `crypto` package.
+Also note what the standard library *didn't* do: it didn't split `net/http` into `net/http/request`, `net/http/response`, and `net/http/handler` just for organizational purity. Those three things are always used together. Splitting them would force every caller to import three packages. A good test: if every package that imports A also always imports B, and they're never used independently, they should probably be one package.
 
-## When NOT to Split a Package
+## The Gotchas
 
-Splitting packages has a cost. Each split adds an import. It adds a namespace. It adds a decision for every caller: which package do I need? If the concepts are tightly coupled and always used together, splitting them makes the API worse.
+**Splitting too eagerly creates import ceremony.** A package with two functions used only in one place doesn't need to exist. Over-splitting adds import statements, adds namespace decisions for callers, and can make code harder to follow when the context jumps between packages constantly.
 
-```go
-// DON'T split these into separate packages just for organizational purity:
-// http/request/   — Request type
-// http/response/  — Response type
-// http/handler/   — Handler interface
-// They're all used together. Splitting makes every caller import three things.
-```
+**`internal` doesn't replace good naming.** Putting everything in `internal/utils` is the same junk drawer problem, just hidden behind the `internal` enforcement. The structure of your packages should reflect the structure of your problem domain, not serve as a filing cabinet.
 
-A good test: if every package that imports Package A also always imports Package B, and they're never used independently, they should probably be one package.
+**Package-level `init()` is a global dependency.** When packages register themselves in `init()` — a common pattern in database drivers and plugin systems — package splits can create subtle ordering dependencies. Be careful when splitting packages that use `init()`.
 
-## One Package, One Idea
+## Key Takeaway
 
-The mental model that cuts through all the edge cases is simple: a package should have one idea at its core. Not one file. Not one function. One *idea*.
+The mental model that cuts through all the edge cases is simple: a package should have one idea at its core. Not one file. Not one function. One *idea*. When you can state it in a short sentence, you have a good package. When you find yourself saying "it contains various utilities for..." — stop, split, and name each piece properly. Good package design makes a codebase navigable: new developers know where to look, dependencies are explicit and acyclic, and names are honest enough that documentation practically writes itself.
 
-`http` is about the HTTP protocol. `json` is about JSON. `retry` is about retrying operations with backoff. `validate` is about validating input.
+---
 
-When you can state the idea in a short sentence, you have a good package. When you find yourself saying "it contains various utilities for..." — that's the warning sign. Stop, split, and name each piece properly.
-
-Good package design isn't about following rules for their own sake. It's about making the codebase navigable. When every package has a clear purpose, new developers know where to look. When dependencies are explicit and acyclic, refactoring is safe. When names are honest, documentation writes itself.
-
-Small packages win not because of some abstract architectural virtue, but because they make the day-to-day work of maintaining a Go codebase significantly more pleasant.
+← [Lesson 21: Composition Over Inheritance](/post/go/go-idioms-composition) | [Course Index](/post/go/) | [Lesson 23: Error Values, Not Exceptions](/post/go/go-idioms-error-values) →

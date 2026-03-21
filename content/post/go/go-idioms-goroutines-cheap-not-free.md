@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: Goroutines Are Cheap, Not Free'
+title: 'Lesson 15: Goroutines Are Cheap, Not Free — 2KB that can eat your server'
 author: Atharva Pandey
 keywords:
   - Go
@@ -14,21 +14,18 @@ tags:
   - Go tutorial
   - golang
 date: '2025-08-11T00:00:00.000Z'
+series: "Idiomatic Go"
+lesson: 15
 ---
-"cheap" is not "free." Every goroutine consumes memory, every running goroutine takes scheduler time, and every goroutine that you start and never stop is a leak. Goroutine leaks are one of the most common performance and correctness problems in production Go services, and they are subtle because they do not crash your program — they just slowly eat your memory until the process OOMs or the scheduler slows to a crawl.
 
-## The Stack: Small But Growable
+"Goroutines are cheap" is something you read in every Go introduction. It's true. A goroutine starts with a 2KB stack and the runtime handles scheduling. Spinning up a thousand of them is trivial. The part the introductions leave out is that "cheap" is not "free," and goroutines that you start and never stop are a leak — one that doesn't crash your program, just slowly eats your memory and degrades your scheduler until something gives.
 
-A goroutine starts with a 2KB stack. If the function needs more — through deep recursion or large local variables — the runtime grows the stack dynamically, up to a default maximum of 1GB (configurable with `GOMAXSTACK`). This growth happens automatically and transparently.
+## The Problem
 
-The practical implication: you do not need to worry about stack sizing for most goroutines. But a goroutine with a deeply recursive algorithm can use much more than 2KB, and a million goroutines each using 10KB is 10GB of memory. Cheap per goroutine can still mean expensive in aggregate.
-
-## The Goroutine Leak
-
-Here is the classic leak pattern:
+Here's the classic goroutine leak, and it's easy to write without realizing it:
 
 ```go
-// WRONG — this goroutine leaks
+// WRONG — this goroutine leaks on every timeout
 func processRequest(input string) string {
     resultCh := make(chan string)
 
@@ -46,20 +43,24 @@ func processRequest(input string) string {
 }
 ```
 
-This looks reasonable. You start a goroutine to do work, use a select to wait for either the result or a timeout. The problem: when the timeout fires, `processRequest` returns. But the goroutine is still running, still trying to send on `resultCh`. Since nobody is reading from `resultCh`, the goroutine blocks on the send forever. It never exits.
+This looks reasonable: start a goroutine, wait for the result or a timeout. The problem: when the timeout fires, `processRequest` returns. The goroutine is still running. When `expensiveComputation` finishes, it tries to send on `resultCh`. Nobody is reading from it. The goroutine blocks on the send — forever. It never exits.
 
-Call `processRequest` under load — say, 1000 requests per second with occasional timeouts — and you are creating goroutines faster than they can exit. Memory climbs, the scheduler has more goroutines to manage, and eventually things get slow or the process dies.
+Under load with occasional timeouts — say a database that gets slow — you're creating leaked goroutines faster than any complete. Memory climbs. The scheduler has an ever-growing list of blocked goroutines to manage. Things get slow, then die.
 
-The fix is to use a buffered channel so the goroutine can send even if nobody is listening, or use a context to signal cancellation:
+The insidious part: this doesn't show up in basic testing. You need load testing or a production incident to see it, and by then you're doing a 2am postmortem.
+
+## The Idiomatic Way
+
+The immediate fix is a buffered channel. The goroutine can always send its result and exit, regardless of whether the caller is still listening:
 
 ```go
-// RIGHT — buffered channel allows goroutine to exit
+// RIGHT — buffered channel lets goroutine exit even after timeout
 func processRequest(input string) string {
-    resultCh := make(chan string, 1) // buffered with capacity 1
+    resultCh := make(chan string, 1) // capacity 1
 
     go func() {
         result := expensiveComputation(input)
-        resultCh <- result // does not block, there is room in the buffer
+        resultCh <- result // never blocks — buffer absorbs the value
     }()
 
     select {
@@ -71,16 +72,10 @@ func processRequest(input string) string {
 }
 ```
 
-With a buffered channel of size 1, the goroutine can always send its result and exit, even if the caller has already returned due to timeout. The result sits in the buffer until the garbage collector cleans up the channel.
-
-## Context-Based Cancellation: The Real Fix
-
-The buffered channel approach stops the leak, but it does not stop the computation. If `expensiveComputation` takes 30 seconds, the goroutine still runs for 30 seconds after the timeout. In a real service, that means CPU and memory consumed for work that nobody will use.
-
-The correct pattern is to pass a context into the computation so it can cancel itself:
+But this only stops the goroutine from leaking — `expensiveComputation` still runs to completion even after the caller has moved on. If it takes 30 seconds, you're burning CPU for 30 seconds on work nobody needs. The real fix is context cancellation:
 
 ```go
-// RIGHT — context cancellation propagates into the work
+// BEST — context stops both the leak and the wasted work
 func processRequest(ctx context.Context, input string) (string, error) {
     ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
     defer cancel()
@@ -108,44 +103,63 @@ func processRequest(ctx context.Context, input string) (string, error) {
 }
 ```
 
-When the timeout fires, `cancel()` is called (via the deferred call when the function returns). The goroutine running `expensiveComputationWithContext` sees the context cancelled and stops early. Both the goroutine and the work stop together.
+When the timeout fires, `cancel()` is called via the defer. The goroutine running `expensiveComputationWithContext` sees the context cancelled and stops early. Both the goroutine and the computation stop together.
 
-## Done Channels for Long-Running Workers
-
-For persistent background goroutines — workers that process jobs from a queue — the pattern is a done channel or a context:
+For fan-out — processing a batch of items concurrently — reach for `errgroup` instead of managing `sync.WaitGroup` manually:
 
 ```go
-// WRONG — worker runs forever with no way to stop it
+import "golang.org/x/sync/errgroup"
+
+func processBatch(ctx context.Context, items []Item) error {
+    g, ctx := errgroup.WithContext(ctx)
+    g.SetLimit(10) // at most 10 goroutines at a time
+
+    for _, item := range items {
+        item := item // capture for Go < 1.22
+        g.Go(func() error {
+            return process(ctx, item)
+        })
+    }
+
+    return g.Wait() // blocks until all done, returns first error
+}
+```
+
+`errgroup` handles the WaitGroup bookkeeping, collects errors, and cancels the shared context when the first error occurs. `SetLimit` prevents spinning up 10,000 goroutines for a 10,000-item batch. This is the pattern to use whenever you're doing bounded concurrent work.
+
+## In The Wild
+
+For long-running background workers, always provide a way to stop them:
+
+```go
+// WRONG — no shutdown path
 func startWorker(jobs <-chan Job) {
     go func() {
         for job := range jobs {
-            process(job)
+            process(job) // runs until process death
         }
     }()
-    // If jobs is never closed, this goroutine runs until process death
 }
 
-// RIGHT — context provides a clean shutdown path
+// RIGHT — context provides clean shutdown
 func startWorker(ctx context.Context, jobs <-chan Job) {
     go func() {
         for {
             select {
             case job, ok := <-jobs:
                 if !ok {
-                    return // channel closed, exit cleanly
+                    return
                 }
                 process(ctx, job)
             case <-ctx.Done():
-                return // context cancelled, exit cleanly
+                return
             }
         }
     }()
 }
 ```
 
-The `ctx.Done()` case ensures the goroutine exits when you want it to — on server shutdown, on test teardown, or when the parent operation is cancelled. The `!ok` check handles the case where the jobs channel is closed explicitly.
-
-In your `main` function or server setup, this looks like:
+In `main`, hook this to OS signals:
 
 ```go
 func main() {
@@ -155,136 +169,65 @@ func main() {
     jobs := make(chan Job, 100)
     startWorker(ctx, jobs)
 
-    // ... rest of server setup ...
-
-    <-ctx.Done() // wait for Ctrl-C or SIGTERM
-    // When ctx is cancelled, the worker exits cleanly
+    <-ctx.Done() // block until Ctrl-C or SIGTERM
+    // worker exits cleanly when ctx is cancelled
 }
 ```
 
-## errgroup for Bounded Fan-Out
+This is the pattern that makes Go services restart gracefully instead of leaving half-processed jobs and zombie goroutines behind.
 
-A common pattern is starting a fixed number of goroutines to process a batch of work, waiting for all of them, and collecting any errors. The naive version is tedious to write correctly:
+## The Gotchas
 
-```go
-// WRONG — common mistakes: ignoring errors, not waiting properly
-func processBatch(items []Item) {
-    for _, item := range items {
-        go func(i Item) {
-            process(i) // errors silently discarded
-        }(item)
-    }
-    // no WaitGroup, function returns before goroutines finish
-}
-
-// Better but still verbose with sync.WaitGroup
-func processBatch(items []Item) error {
-    var wg sync.WaitGroup
-    errCh := make(chan error, len(items))
-
-    for _, item := range items {
-        wg.Add(1)
-        go func(i Item) {
-            defer wg.Done()
-            if err := process(i); err != nil {
-                errCh <- err
-            }
-        }(item)
-    }
-
-    wg.Wait()
-    close(errCh)
-
-    for err := range errCh {
-        return err // return first error
-    }
-    return nil
-}
-```
-
-The idiomatic solution is `golang.org/x/sync/errgroup`:
+**Goroutine counts don't decline on their own if you have leaks.** Monitor `runtime.NumGoroutine()` in production. If it climbs monotonically over hours, you have a leak. Wire it to a metric or log it periodically:
 
 ```go
-// RIGHT — errgroup handles WaitGroup, error collection, and context cancellation
-import "golang.org/x/sync/errgroup"
-
-func processBatch(ctx context.Context, items []Item) error {
-    g, ctx := errgroup.WithContext(ctx)
-
-    for _, item := range items {
-        item := item // capture loop variable (pre-Go 1.22)
-        g.Go(func() error {
-            return process(ctx, item)
-        })
-    }
-
-    return g.Wait() // waits for all goroutines, returns first non-nil error
-}
-```
-
-`errgroup.WithContext` also cancels the context when the first error occurs, so other goroutines in the group can detect the failure and stop early.
-
-For truly bounded concurrency — you want at most N goroutines running at a time — use `errgroup.SetLimit`:
-
-```go
-func processBatch(ctx context.Context, items []Item) error {
-    g, ctx := errgroup.WithContext(ctx)
-    g.SetLimit(10) // at most 10 goroutines at a time
-
-    for _, item := range items {
-        item := item
-        g.Go(func() error {
-            return process(ctx, item)
-        })
-    }
-
-    return g.Wait()
-}
-```
-
-`SetLimit` blocks `g.Go` when the limit is reached. Items are processed in batches of 10, and the call to `g.Go` automatically waits for a slot to open up. This is the right tool when you are hitting a rate-limited API or doing database operations where you do not want to open 10,000 connections at once.
-
-## Detecting Leaks in Production
-
-The Go runtime exposes goroutine counts via the `runtime` package and the pprof endpoints:
-
-```go
-import "runtime"
-
-func logGoroutineCount() {
+go func() {
     ticker := time.NewTicker(30 * time.Second)
     for range ticker.C {
-        log.Printf("goroutine count: %d", runtime.NumGoroutine())
+        log.Printf("goroutines: %d", runtime.NumGoroutine())
     }
+}()
+```
+
+And enable pprof in non-production builds so you can dump goroutine stacks to see what they're blocked on: `http://localhost:6060/debug/pprof/goroutine?debug=2`.
+
+**The loop variable capture bug** (pre-Go 1.22). Before Go 1.22, goroutines launched inside a loop all share the same loop variable. By the time the goroutines run, the loop has advanced and they all see the last value:
+
+```go
+// WRONG in Go < 1.22
+for _, item := range items {
+    go func() {
+        process(item) // all goroutines may see the same item
+    }()
+}
+
+// RIGHT in Go < 1.22
+for _, item := range items {
+    item := item // new variable per iteration
+    go func() {
+        process(item)
+    }()
 }
 ```
 
-If `runtime.NumGoroutine()` climbs monotonically over time, you have a leak. Use the pprof endpoint to see what they are waiting on:
+Go 1.22 fixed this — loop variables are now per-iteration. But if you're on an older version or reading code that runs on older versions, this is a real bug.
 
-```go
-import _ "net/http/pprof"
-
-// In main:
-go http.ListenAndServe(":6060", nil)
-```
-
-Then hit `http://localhost:6060/debug/pprof/goroutine?debug=2` to see a full goroutine dump with stack traces. Leaked goroutines typically show up blocked on a channel send or receive.
-
-The `goleak` package (github.com/uber-go/goleak) is a testing tool that fails a test if goroutines are left running after it completes:
+**Use `goleak` in tests.** The `uber-go/goleak` package fails a test if any goroutines are still running after the test completes. It catches leaks at development time, which is the right time to catch them:
 
 ```go
 func TestProcessRequest(t *testing.T) {
     defer goleak.VerifyNone(t)
-
-    result := processRequest("some input")
-    // If processRequest leaks a goroutine, goleak will catch it
+    result, _ := processRequest(context.Background(), "input")
+    _ = result
 }
 ```
 
-Adding `goleak` to your test suite for concurrent code is one of the highest-ROI things you can do. It catches leaks at development time before they show up in production metrics.
+If your function leaks a goroutine, this test fails with a stack trace pointing at the leaked goroutine. Add it to any test that involves concurrency.
 
-## The Mental Model
+## Key Takeaway
 
-Think of goroutines like open file descriptors. Files are cheap to open — your system supports thousands of them. But a process that opens files and never closes them will eventually exhaust the limit. Goroutines are the same: cheap to create, but every one you start must have a clear exit condition.
+Think of goroutines like open file descriptors: cheap per unit, but every one you start must have a clear exit condition. Before spawning a goroutine, ask "what will cause this to stop?" If the answer is "nothing" or "I'm not sure," fix the design. The exit conditions aren't complex — context cancellation, done channels, closed input channels. They become muscle memory quickly. The production stability payoff is significant: services that don't slowly leak goroutines are services that stay up.
 
-Before spawning a goroutine, ask: "What will cause this goroutine to exit?" If the answer is "nothing" or "I'm not sure," fix the design before the goroutine becomes a leak. The patterns are not complex: context cancellation, done channels, `errgroup`. They become second nature quickly, and the production stability improvement is significant.
+---
+
+← [Lesson 14: context.Context](/post/go/go-idioms-context) | [Course Index](#) | [Lesson 16: Channels for Coordination](/post/go/go-idioms-channels-coordination) →

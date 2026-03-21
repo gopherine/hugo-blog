@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: Composition Over Inheritance'
+title: 'Lesson 21: Composition Over Inheritance — Small pieces, loosely joined'
 author: Atharva Pandey
 keywords:
   - Go
@@ -12,23 +12,16 @@ keywords:
 tags:
   - Go tutorial
   - golang
+series: "Idiomatic Go"
+lesson: 21
 date: '2025-06-02T00:00:00.000Z'
 ---
-ve come from Java or C++, you're probably waiting for Go to show you its inheritance model. Where's the `extends` keyword? Where are the base classes? The answer is: there aren't any. Go made a deliberate choice to leave them out, and it's one of the better decisions in the language's design.
 
-Go uses composition instead. You build complex behavior by combining small, focused pieces — not by constructing deep hierarchies that your colleagues will need a whiteboard to untangle six months later.
+If you've come from Java or C++, you're probably waiting for Go to show you its inheritance model. Where's the `extends` keyword? Where are the base classes? There aren't any — Go made a deliberate choice to leave them out. After writing a few thousand lines of Go, most people agree it was the right call.
 
-## "Has-A" vs "Is-A"
+## The Problem
 
-Object-oriented languages lean heavily on the "is-a" relationship. A `Dog` is-a `Animal`. A `Manager` is-a `Employee`. This sounds elegant until real-world complexity enters the picture: is a `FlyingFish` a `Fish` or a `Bird`? Do you give it two parents? Now you're in multiple inheritance territory and things get messy fast.
-
-Go flips the model. Rather than asking what something *is*, you ask what something *has* or *can do*. A `Dog` has locomotion behavior. It has a sound. You compose those capabilities rather than inheriting them from a common ancestor.
-
-This shift is subtle but it changes how you design systems from the ground up.
-
-## Struct Embedding
-
-The mechanical way Go enables composition is struct embedding. You place one type inside another without giving it a field name.
+Object-oriented languages lean heavily on the "is-a" relationship. A `Dog` is-a `Animal`. A `Manager` is-a `Employee`. This sounds elegant until real-world complexity enters the picture: is a `FlyingFish` a `Fish` or a `Bird`? Now you're in multiple inheritance territory and things get messy fast. And in Go, the instinct to fake it with named fields creates its own noise:
 
 ```go
 // WRONG — using a named field when you want to promote behavior
@@ -51,6 +44,12 @@ func main() {
 }
 ```
 
+Every call site has to know about `logger`. Refactoring what that field is called breaks every call site. You've created tight coupling through a back door.
+
+## The Idiomatic Way
+
+Embed the type without naming it. Go promotes the embedded type's methods onto the outer struct automatically.
+
 ```go
 // RIGHT — embed the type to promote its methods
 type Logger struct {
@@ -72,31 +71,14 @@ func main() {
 }
 ```
 
-When you embed `Logger` without a field name, all of `Logger`'s exported methods get promoted onto `Server`. Callers can call `s.Log(...)` directly. The embedded type's name becomes an implicit field name when you need to refer to it explicitly — `s.Logger` — but you rarely need to.
+When you embed `Logger` without a field name, all of `Logger`'s exported methods get promoted onto `Server`. The embedded type's name becomes an implicit field when you need to reach into it explicitly — `s.Logger` — but you rarely need to.
 
-## Embedding Interfaces
-
-You can embed interfaces too, not just concrete types. This is a powerful pattern that shows up throughout the standard library.
+You can embed interfaces too, not just concrete types. This is the pattern behind Go's entire `http` middleware ecosystem:
 
 ```go
-// WRONG — implementing a large interface fully when you only need one method
-type ReadWriteCloser interface {
-    Read(p []byte) (n int, err error)
-    Write(p []byte) (n int, err error)
-    Close() error
-}
-
-type MyWriter struct{}
-
-func (w MyWriter) Read(p []byte) (int, error)  { return 0, nil }  // fake, unused
-func (w MyWriter) Write(p []byte) (int, error) { return len(p), nil }
-func (w MyWriter) Close() error                { return nil }  // fake, unused
-```
-
-```go
-// RIGHT — embed the interface to satisfy it partially or wrap it
+// RIGHT — embed an interface to override only the methods you care about
 type responseRecorder struct {
-    http.ResponseWriter        // embed the interface
+    http.ResponseWriter        // satisfies the full interface automatically
     statusCode int
     body       bytes.Buffer
 }
@@ -108,43 +90,31 @@ func (r *responseRecorder) WriteHeader(code int) {
 
 func (r *responseRecorder) Write(b []byte) (int, error) {
     r.body.Write(b)
-    return r.ResponseWriter.Write(b)  // delegate to original
+    return r.ResponseWriter.Write(b)
 }
 ```
 
-This `responseRecorder` satisfies `http.ResponseWriter` completely — not because it implements every method, but because it embeds the interface and only overrides the two methods it cares about. The rest delegate automatically.
+`responseRecorder` satisfies `http.ResponseWriter` completely — not because it implements every method, but because it embeds the interface and only overrides the two it cares about.
 
-## Shadowing Embedded Methods
-
-When an outer struct defines a method with the same name as an embedded type's method, the outer method wins. This is called shadowing, and it's how you customize behavior without modifying the original type.
+When an outer struct defines a method with the same name as an embedded type's method, the outer method wins. That's shadowing — it's how you customize behavior without touching the original:
 
 ```go
 type Base struct{}
 
-func (b Base) Describe() string {
-    return "I am Base"
-}
+func (b Base) Describe() string { return "I am Base" }
 
-type Extended struct {
-    Base
-}
+type Extended struct{ Base }
 
 func (e Extended) Describe() string {
     return "I am Extended (Base says: " + e.Base.Describe() + ")"
 }
-
-func main() {
-    e := Extended{}
-    fmt.Println(e.Describe())
-    // Output: I am Extended (Base says: I am Base)
-}
 ```
 
-`e.Describe()` calls `Extended`'s version. If you want the embedded version, you reach through the field: `e.Base.Describe()`. This explicit call is intentional — Go doesn't do magic dispatch.
+`e.Describe()` calls `Extended`'s version. Reach through explicitly if you want the embedded one: `e.Base.Describe()`. Go never does magic dispatch.
 
-## Real Example: HTTP Middleware Through Composition
+## In The Wild
 
-HTTP middleware is where composition really shines. The standard library's `http.Handler` interface is just one method:
+HTTP middleware is where composition really shines. The standard library's `http.Handler` is one method:
 
 ```go
 type Handler interface {
@@ -152,10 +122,9 @@ type Handler interface {
 }
 ```
 
-You can compose an entire middleware stack by wrapping handlers:
+You compose an entire middleware stack by wrapping handlers:
 
 ```go
-// Logging middleware
 func withLogging(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         start := time.Now()
@@ -165,7 +134,6 @@ func withLogging(next http.Handler) http.Handler {
     })
 }
 
-// Auth middleware
 func withAuth(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         token := r.Header.Get("Authorization")
@@ -177,7 +145,6 @@ func withAuth(next http.Handler) http.Handler {
     })
 }
 
-// Recovery middleware
 func withRecovery(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         defer func() {
@@ -190,31 +157,27 @@ func withRecovery(next http.Handler) http.Handler {
     })
 }
 
-// Your actual handler
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprintln(w, "hello, world")
-}
-
 func main() {
     handler := http.HandlerFunc(helloHandler)
-
-    // Compose the stack — inner to outer
     stack := withLogging(withAuth(withRecovery(handler)))
-
     http.ListenAndServe(":8080", stack)
 }
 ```
 
-Each middleware function takes an `http.Handler` and returns an `http.Handler`. They know nothing about each other. You compose them by nesting the calls, and the request flows through each layer in order. Adding rate limiting later means writing one more function and adding it to the chain — the existing code doesn't change.
+Each middleware takes an `http.Handler` and returns an `http.Handler`. They know nothing about each other. Adding rate limiting later means writing one more function and adding it to the chain — the existing code doesn't change. Compare that to an inheritance-based approach where changing the order of two concerns requires restructuring a class hierarchy.
 
-Compare this to an inheritance-based approach where you'd have `BaseHandler`, `LoggingHandler extends BaseHandler`, `AuthHandler extends LoggingHandler`, and suddenly changing the order of two concerns requires restructuring a class hierarchy.
+## The Gotchas
 
-## Why This Matters in Practice
+**Embedding leaks the embedded type's entire surface.** If you embed a `sync.Mutex`, callers can call `s.Lock()` directly on your outer struct. That's usually not what you want. Consider embedding as a private field instead, or exposing only the methods you actually intend to make public.
 
-Composition keeps your code flexible in ways that inheritance doesn't. When a requirement changes — say, you want logging but not auth on a particular route — you just assemble a different stack. With inheritance, you'd either add a parameter to the base class or create another subclass.
+**Embedding isn't inheritance.** When you embed `Logger` in `Server`, passing `Server` to a function that expects `Logger` still doesn't work. Go doesn't do implicit upcasting. Embedding promotes methods, it doesn't establish an "is-a" type relationship.
 
-The other advantage is testability. Each piece is small and focused. You can test `withAuth` in isolation by passing a mock handler. You can test your business logic handler without any middleware in the picture at all.
+**Shadowed methods can hide bugs.** If an embedded type gains a new method in a later version that has the same name as a method on your outer type, your outer method silently shadows it. The compiler won't warn you. Keep embedded types in dependencies narrow, or embed interfaces rather than large concrete types.
 
-Go doesn't give you inheritance because the designers concluded it creates more problems than it solves. After writing a few thousand lines of Go, most developers agree with them.
+## Key Takeaway
 
-The principle is simple: instead of asking "what does this type inherit?", ask "what does this type know how to do, and what does it delegate?" Build from pieces. Keep each piece small. Compose them when you need something larger.
+Go flips the inheritance model: instead of asking what a type *is*, you ask what it *has* and what it *can do*. Struct embedding promotes methods onto the outer type, letting you build complex behavior by combining small, focused pieces. The middleware pattern — each function wrapping one `http.Handler` and returning another — is the purest expression of this in the standard library. Once you internalize it, you'll stop missing class hierarchies entirely.
+
+---
+
+← [Lesson 20: internal Package Is Underrated](/post/go/go-idioms-internal-package) | [Course Index](/post/go/) | [Lesson 22: Small Packages Win](/post/go/go-idioms-small-packages) →

@@ -122,6 +122,13 @@ body {
 .sticky-header {
   position: sticky;
   top: 0;
+  background: var(--color-bg-primary, #fff);
+  z-index: 2;
+}
+
+/* Ensure first paragraph isn't hidden behind sticky post header */
+.Box-body .markdown-body > *:first-child {
+  margin-top: 0.5em;
 }
 
 .tippy-box {

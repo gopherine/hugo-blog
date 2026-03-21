@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: Nil Slice vs Empty Slice'
+title: 'Lesson 11: Nil Slice vs Empty Slice — Same length, different meaning'
 author: Atharva Pandey
 keywords:
   - Go
@@ -12,68 +12,75 @@ tags:
   - Go tutorial
   - golang
 date: '2025-11-03T00:00:00.000Z'
+series: "Idiomatic Go"
+lesson: 11
 ---
-"wait, what?" moments in Go is discovering that there are two ways to have a slice with zero elements, and they are not the same thing. This surprises developers coming from languages where an empty collection is just an empty collection. In Go, the difference between a nil slice and an empty slice is subtle, but it shows up in real code in ways that bite people.
 
-Let's break down exactly what is happening, where it matters, and when to use each one.
+Go has two ways to have a slice with zero elements, and they are not the same thing. Developers coming from Python, Ruby, or JavaScript expect an empty collection to just be an empty collection. In Go, the distinction between a nil slice and an empty slice is subtle enough that you can miss it for months — right up until a frontend engineer files a bug because your API is returning `null` instead of `[]`.
 
-## The Two Ways to Have a Zero-Length Slice
+## The Problem
+
+The problem isn't that nil slices exist. The problem is that most Go code treats them as interchangeable with empty slices, which they almost are — until they aren't.
 
 ```go
-// Nil slice — declared but not initialized
-var s []int
+// Both have length 0. Both can be appended to. Looks the same, right?
+var s []string        // nil slice
+s2 := []string{}     // empty slice
 
-// Empty slice — explicitly initialized with no elements
-s2 := []int{}
+fmt.Println(len(s), len(s2))   // 0 0
+fmt.Println(s == nil)          // true
+fmt.Println(s2 == nil)         // false
 
-// Also an empty slice
-s3 := make([]int, 0)
+// Now marshal them both
+b1, _ := json.Marshal(s)
+b2, _ := json.Marshal(s2)
+
+fmt.Println(string(b1)) // null   <-- uh oh
+fmt.Println(string(b2)) // []
 ```
 
-Both `s` and `s2` have a length of zero and a capacity of zero. You can call `len()` and `cap()` on either one and get back `0`. Appending to either one works identically. At first glance they seem interchangeable, and that is exactly why the distinction trips people up.
+That `null` vs `[]` is a real API contract bug. A JavaScript frontend doing `data.items.map(...)` will throw a runtime exception when `items` is `null`. Your Go code compiled and ran fine. Your tests passed. Your users got a 500.
 
-## Where They Actually Differ
+## The Idiomatic Way
 
-### The nil check
-
-This is the most obvious difference:
+The rule I follow: use a nil slice when you're accumulating results in a loop. Use an empty slice at API boundaries where the value will be JSON-encoded.
 
 ```go
-var s []int
-s2 := []int{}
-
-fmt.Println(s == nil)  // true
-fmt.Println(s2 == nil) // false
-```
-
-A nil slice is, well, nil. An empty slice is a real slice value that happens to have no elements. If some function in your codebase returns a nil slice to signal "nothing found" and something else returns an empty slice to signal the same thing, you will have inconsistent nil checks scattered throughout the code. Pick one convention and stick to it.
-
-### JSON encoding — the sneaky one
-
-This is where the difference really matters in production. JSON encoding treats nil slices and empty slices differently:
-
-```go
-// WRONG — or at least surprising
-type Response struct {
-    Items []string
+// Internal — nil slice is idiomatic here. append works on nil.
+func findActiveUsers(users []User) []User {
+    var result []User
+    for _, u := range users {
+        if u.Active {
+            result = append(result, u)
+        }
+    }
+    return result
 }
 
-r1 := Response{} // Items is nil
-r2 := Response{Items: []string{}} // Items is empty
+// API boundary — initialize empty so JSON produces [] not null
+func handleListUsers(w http.ResponseWriter, r *http.Request) {
+    users := findActiveUsers(allUsers)
 
-b1, _ := json.Marshal(r1)
-b2, _ := json.Marshal(r2)
+    response := struct {
+        Users []User `json:"users"`
+    }{
+        Users: users,
+    }
 
-fmt.Println(string(b1)) // {"Items":null}
-fmt.Println(string(b2)) // {"Items":[]}
+    // Normalize at the boundary
+    if response.Users == nil {
+        response.Users = []User{}
+    }
+
+    json.NewEncoder(w).Encode(response)
+}
 ```
 
-That `null` vs `[]` difference is a real API contract issue. If you are returning a list of results from an API endpoint and there are no results, most API consumers expect `[]`, not `null`. A frontend developer parsing `null` as a list will get a runtime error. The fix is to initialize with an empty slice explicitly when you know you are building a response that will be JSON-encoded:
+Alternatively, initialize the function return as empty from the start if it's always going to be JSON-encoded:
 
 ```go
-// RIGHT — when building API responses
 func getItems(db *sql.DB) []string {
-    items := []string{} // not var items []string
+    items := []string{} // not: var items []string
 
     rows, err := db.Query("SELECT name FROM items")
     if err != nil {
@@ -91,122 +98,47 @@ func getItems(db *sql.DB) []string {
 }
 ```
 
-## Append Works on Both — This Is Intentional
+The append still works perfectly. The only thing that changed is what gets serialized when the query returns nothing.
 
-One thing that confuses newcomers is that `append` happily works on a nil slice. There is no nil pointer panic here:
+## In The Wild
 
-```go
-var s []int
+I've seen this bite teams building microservices that aggregate data from multiple sources. Say you have a `/recommendations` endpoint that queries a recommendation engine. If the engine has no results for a new user, the Go handler returns a nil slice, your JSON response looks like `{"recommendations": null}`, and the mobile app — which was written assuming the field is always an array — crashes on first launch for new users.
 
-// This is perfectly fine
-s = append(s, 1, 2, 3)
+The fix ends up being a one-liner, but you only find it after a Sentry alert at 2am. Initializing to `[]string{}` at the function that touches the database would have prevented the whole thing.
 
-fmt.Println(s)    // [1 2 3]
-fmt.Println(s == nil) // false — append returned a new slice
-```
+## The Gotchas
 
-Go's runtime handles the nil case in `append` by allocating a new backing array. This means the common pattern of declaring a nil slice and then building it up with `append` in a loop is totally idiomatic Go. You do not need to initialize with `make` first unless you know the capacity ahead of time.
+**reflect.DeepEqual distinguishes them in tests.** This one trips people up constantly:
 
 ```go
-// Idiomatic — no pre-initialization needed
-func filterEven(nums []int) []int {
-    var result []int // nil slice, that's fine
-    for _, n := range nums {
-        if n%2 == 0 {
-            result = append(result, n)
-        }
-    }
-    return result
-}
-```
-
-If there are no even numbers, `result` stays nil. Whether that is the right behavior depends on whether the caller will JSON-encode the result or just range over it.
-
-## The reflect.DeepEqual Gotcha
-
-Here is one that shows up in tests:
-
-```go
-// WRONG — this test will fail
 func TestFilter(t *testing.T) {
-    got := filterEven([]int{1, 3, 5})
-    want := []int{}
+    got := findActiveUsers([]User{}) // returns nil if no active users
+    want := []User{}                 // explicitly empty
 
     if !reflect.DeepEqual(got, want) {
-        t.Errorf("got %v, want %v", got, want)
+        t.Errorf("got %v, want %v", got, want) // this FAILS
     }
 }
 ```
 
-`reflect.DeepEqual` distinguishes between nil and empty slices. If `filterEven` returns a nil slice (because it found nothing and used `var result []int`) and you compare it to `[]int{}`, the test fails even though both have zero elements and both behave the same way in every practical sense.
+`reflect.DeepEqual` treats nil and empty as different. Either compare with `len(got) != len(want)` or be consistent about which form your functions return.
 
-The fix is to be consistent. Either:
+**The nil check you forgot.** Some codebases use nil slices to signal "no data" and empty slices to signal "we checked and there's nothing." That's a valid convention — but only if you enforce it everywhere. Mixed conventions produce code where callers can't trust nil checks:
 
 ```go
-// Option A: compare against nil
-want := []int(nil)
-
-// Option B: use len check instead of DeepEqual
-if len(got) != len(want) {
-    t.Errorf(...)
-}
-
-// Option C: initialize result as empty slice in filterEven
-var result = []int{}
-```
-
-Option C is often the cleanest for functions that are returning data to callers — initialize as empty so the behavior is predictable regardless of how many items were found.
-
-## When to Use Which
-
-Here is a practical mental model:
-
-**Use a nil slice (`var s []int`) when:**
-- You are accumulating results in a loop and will use `append` to build the slice. The nil start is idiomatic.
-- The nil state has meaning in your domain — for example, "the field was not set" versus "the field was set to an empty list."
-- You are writing internal logic where JSON encoding is not involved.
-
-**Use an empty slice (`s := []int{}` or `make([]int, 0)`) when:**
-- The value will be JSON-encoded and you want `[]` instead of `null`.
-- You are writing a function that returns a collection and want callers to get a consistent, non-nil value.
-- You are working with a library or protocol that differentiates between null and empty.
-
-```go
-// Practical example: domain layer vs API layer
-
-// Internal — nil slice is fine here
-func findMatchingUsers(users []User, role string) []User {
-    var result []User
-    for _, u := range users {
-        if u.Role == role {
-            result = append(result, u)
-        }
-    }
-    return result
-}
-
-// API handler — initialize empty to control JSON output
-func handleListUsers(w http.ResponseWriter, r *http.Request) {
-    users := findMatchingUsers(allUsers, r.URL.Query().Get("role"))
-
-    response := struct {
-        Users []User `json:"users"`
-    }{
-        Users: users,
-    }
-
-    // If users is nil, JSON will produce {"users":null}
-    // Fix: normalize at the boundary
-    if response.Users == nil {
-        response.Users = []User{}
-    }
-
-    json.NewEncoder(w).Encode(response)
+if users == nil {
+    // does this mean "we didn't query" or "we queried and got nothing"?
 }
 ```
 
-## The Core Mental Model
+Pick one meaning and document it.
 
-Think of a nil slice as the zero value of the slice type — it exists, it is valid, you can use it, but it has not been explicitly created. An empty slice has been explicitly created; someone said "I want a list with zero items."
+**append changes nil to non-nil.** After `s = append(s, item)`, `s` is no longer nil even if it was before. Code that relies on a nil check after appending will get wrong results.
 
-In most loop-and-append patterns, nil slices are perfectly idiomatic. At API boundaries — especially JSON — normalize to an empty slice to avoid surprising consumers. Keep that distinction in mind and you will avoid most of the headaches this topic causes.
+## Key Takeaway
+
+Nil and empty slices are functionally identical for most operations in Go — ranging, appending, passing to functions. The difference only matters at two boundaries: JSON serialization and nil checks. My default is to use nil slices internally (they're idiomatic with append loops) and normalize to empty slices at the edges of your system before any marshaling happens. If you're writing a function whose output will eventually be JSON-encoded, just initialize with `[]T{}` and save yourself the debugging session.
+
+---
+
+← [Lesson 10: Zero Values Are Useful](/post/go/go-idioms-zero-values) | [Course Index](#) | [Lesson 12: Value vs Pointer Receivers](/post/go/go-idioms-value-vs-pointer-receivers) →

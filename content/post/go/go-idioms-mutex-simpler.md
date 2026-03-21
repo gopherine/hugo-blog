@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: sync.Mutex Is Often Simpler'
+title: 'Lesson 18: sync.Mutex Is Often Simpler — Not everything needs a channel'
 author: Atharva Pandey
 keywords:
   - Go
@@ -14,14 +14,17 @@ tags:
   - Go tutorial
   - golang
 date: '2025-10-20T00:00:00.000Z'
+series: "Idiomatic Go"
+lesson: 18
 ---
-ve absorbed the Go concurrency philosophy — share memory by communicating — you might be tempted to reach for channels every time two goroutines need to share data. Resist that. Channels are for coordination and ownership transfer. For shared mutable state that multiple goroutines need to read and write, a mutex is usually clearer, simpler, and faster.
 
-Rob Pike himself addressed this in his 2012 Go Concurrency Patterns talk. The message wasn't "always use channels." It was: "think about what you're actually doing." If you're passing ownership of data, use a channel. If you're protecting access to state that persists and changes over time, use a mutex. The right tool depends on the problem.
+After you absorb the Go concurrency philosophy — share memory by communicating — there's a temptation to reach for channels every time two goroutines need to share data. Resist that. Channels are for coordination and ownership transfer. For shared mutable state that multiple goroutines read and write, a mutex is usually clearer, simpler, and faster. Using a channel where a mutex belongs is one of those things that looks idiomatic but isn't.
 
-## sync.Mutex: The Basics
+Rob Pike addressed this directly. The message wasn't "always use channels." It was: think about what you're actually doing. Passing ownership? Channel. Protecting access to persisted, mutable state? Mutex.
 
-A `sync.Mutex` has two methods: `Lock` and `Unlock`. Only one goroutine can hold the lock at a time. Everything else blocks until the lock is released.
+## The Problem
+
+The most obvious version: unprotected shared state causes data races.
 
 ```go
 // WRONG — no protection, data race
@@ -30,7 +33,7 @@ type Counter struct {
 }
 
 func (c *Counter) Increment() {
-    c.count++  // read-modify-write: not atomic, not safe
+    c.count++ // read-modify-write: not atomic, not safe
 }
 
 func (c *Counter) Value() int {
@@ -38,7 +41,26 @@ func (c *Counter) Value() int {
 }
 ```
 
-Run `go test -race` on code like this and the race detector will catch it immediately. The `++` operation is not atomic — it's a read, an increment, and a write. Two goroutines doing this simultaneously will corrupt the value.
+Run `go test -race` on this and the race detector catches it immediately. The `++` operation is three steps — read, increment, write — and two goroutines doing it simultaneously corrupt the value silently.
+
+The more subtle version: holding a lock for too long.
+
+```go
+// WRONG — holding the lock during slow I/O
+func (s *Store) SaveToFile(path string) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+
+    data, _ := json.Marshal(s.data)    // fast, fine
+    return os.WriteFile(path, data, 0644) // slow — blocks everything on s
+}
+```
+
+Every goroutine trying to access `s` is now queued behind a file write. You've serialized your entire program through a disk operation.
+
+## The Idiomatic Way
+
+The canonical mutex pattern: lock, defer unlock, do the work.
 
 ```go
 // RIGHT — protecting shared state with a mutex
@@ -60,55 +82,16 @@ func (c *Counter) Value() int {
 }
 ```
 
-The pattern is always: lock, defer unlock, then do the work. The `defer` ensures the mutex is released even if the function panics. Never hold a mutex across a `return` without a `defer` — you'll eventually miss a return path and deadlock.
+The `defer` ensures the mutex is released even if the function panics. Never hold a mutex across a return without a defer — you'll eventually miss a return path and deadlock.
 
-## The Lock/Defer Unlock Pattern
-
-The defer-based unlock is the canonical Go pattern for a reason. It's safe against early returns and panics, and it makes the critical section visually obvious.
+For the I/O case, snapshot under the lock and release before the slow operation:
 
 ```go
-// WRONG — manual unlock, prone to missed returns
-func (s *Store) Get(key string) (string, bool) {
-    s.mu.Lock()
-    val, ok := s.data[key]
-    if !ok {
-        s.mu.Unlock()  // easy to forget in every branch
-        return "", false
-    }
-    s.mu.Unlock()
-    return val, ok
-}
-```
-
-Add another early return and you'll forget an `Unlock`. Then you'll have a deadlock that only shows up under specific conditions.
-
-```go
-// RIGHT — defer handles all exit paths
-func (s *Store) Get(key string) (string, bool) {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-    val, ok := s.data[key]
-    return val, ok
-}
-```
-
-One lock, one defer, done. However, be mindful of how wide your critical section is. If you hold a lock while doing I/O or other slow operations, you're serializing your entire program through that bottleneck. Keep critical sections as narrow as possible.
-
-```go
-// WRONG — holding the lock during slow I/O
-func (s *Store) SaveToFile(path string) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-
-    data, _ := json.Marshal(s.data)  // fast, fine inside lock
-    return os.WriteFile(path, data, 0644)  // slow I/O — blocks all other operations on s
-}
-
-// RIGHT — snapshot the data under the lock, then do I/O outside
+// RIGHT — snapshot the data under the lock, then I/O outside
 func (s *Store) SaveToFile(path string) error {
     s.mu.Lock()
     snapshot, err := json.Marshal(s.data)
-    s.mu.Unlock()  // explicit unlock — we're done with the protected state
+    s.mu.Unlock() // explicit unlock — done with protected state
 
     if err != nil {
         return fmt.Errorf("SaveToFile: marshaling: %w", err)
@@ -117,9 +100,7 @@ func (s *Store) SaveToFile(path string) error {
 }
 ```
 
-## sync.RWMutex: When Reads Dominate
-
-`sync.Mutex` is exclusive: every operation — read or write — requires the exclusive lock. If your workload is mostly reads with occasional writes, this is unnecessarily restrictive. `sync.RWMutex` allows multiple concurrent readers, but only one writer at a time.
+When reads heavily outnumber writes, `sync.RWMutex` lets multiple goroutines hold a read lock simultaneously:
 
 ```go
 type Cache struct {
@@ -127,7 +108,6 @@ type Cache struct {
     items map[string]string
 }
 
-// Read operation — use RLock/RUnlock
 func (c *Cache) Get(key string) (string, bool) {
     c.mu.RLock()
     defer c.mu.RUnlock()
@@ -135,7 +115,6 @@ func (c *Cache) Get(key string) (string, bool) {
     return val, ok
 }
 
-// Write operation — use Lock/Unlock (exclusive)
 func (c *Cache) Set(key, value string) {
     c.mu.Lock()
     defer c.mu.Unlock()
@@ -143,112 +122,13 @@ func (c *Cache) Set(key, value string) {
 }
 ```
 
-The rule: use `RLock/RUnlock` for read-only access, `Lock/Unlock` for writes. Multiple goroutines can hold `RLock` simultaneously. A `Lock` call waits for all existing readers to finish and blocks new readers until the write completes.
+`RLock/RUnlock` for reads; `Lock/Unlock` for writes. Multiple goroutines can hold `RLock` simultaneously. A `Lock` waits for all readers to finish. Don't over-optimize: `RWMutex` has higher per-operation overhead than `Mutex`. It pays off when reads genuinely dominate and there's real contention.
+
+## In The Wild
+
+Here's a concrete example of where mutex is obviously the right call — a rate limiter:
 
 ```go
-// WRONG — using a full Mutex when reads dominate
-type Config struct {
-    mu     sync.Mutex  // every read blocks all other reads
-    values map[string]string
-}
-
-// RIGHT — use RWMutex when reads are frequent
-type Config struct {
-    mu     sync.RWMutex
-    values map[string]string
-}
-```
-
-Don't over-optimize: if your critical section is tiny and called infrequently, the difference between `Mutex` and `RWMutex` won't matter. `RWMutex` has higher overhead per operation than `Mutex`. It pays off when reads truly outnumber writes by a significant margin and the critical section has enough contention to matter.
-
-## Common Mistakes
-
-**Copying a mutex.** A mutex must not be copied after first use. If you copy a struct that contains a mutex, you copy the mutex's internal state, which leads to undefined behavior.
-
-```go
-// WRONG — copying a Counter copies the mutex
-func processCounter(c Counter) {  // passed by value — mutex is copied!
-    c.Increment()
-}
-
-// RIGHT — always pass mutex-containing structs by pointer
-func processCounter(c *Counter) {
-    c.Increment()
-}
-```
-
-The `go vet` tool catches this with the `copylocks` checker. Run it as part of your CI pipeline.
-
-**Locking too wide.** Holding a lock while doing anything slow — network calls, file I/O, channel operations — serializes your program. Other goroutines pile up waiting. Snapshot the data under the lock and release it before the slow operation, as shown earlier.
-
-**Recursive locking.** Go's `sync.Mutex` is not reentrant. If a function holding a lock calls another function that tries to acquire the same lock, it deadlocks. Design your API so that exported methods acquire the lock, and unexported helper methods operate without it (assuming the caller holds it).
-
-```go
-// WRONG — unexported helper re-acquires the lock
-func (s *Store) Delete(key string) {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-    s.deleteInternal(key)  // deadlock if deleteInternal also locks
-}
-
-// RIGHT — unexported helpers don't lock; exported methods do
-func (s *Store) Delete(key string) {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-    s.deleteInternal(key)  // operates assuming lock is held
-}
-
-func (s *Store) deleteInternal(key string) {
-    // No lock here — caller must hold it
-    delete(s.data, key)
-    s.onDelete(key)
-}
-```
-
-## sync.Map: For Specific Use Cases
-
-`sync.Map` is a specialized concurrent map built into the standard library. It's not a replacement for `map` + `RWMutex` in general. It's optimized for two specific scenarios: when the map is written once and read many times, or when goroutines operate on disjoint sets of keys.
-
-```go
-// sync.Map usage
-var m sync.Map
-
-// Store a value
-m.Store("key", "value")
-
-// Load a value
-val, ok := m.Load("key")
-if ok {
-    fmt.Println(val.(string))
-}
-
-// Load or store atomically
-actual, loaded := m.LoadOrStore("key", "default")
-fmt.Println(actual, loaded)
-
-// Delete
-m.Delete("key")
-
-// Range over all entries
-m.Range(func(key, value any) bool {
-    fmt.Println(key, value)
-    return true  // return false to stop iteration
-})
-```
-
-The type signature is `interface{}` (or `any`), so you lose compile-time type safety. For most general-purpose concurrent maps, `map[K]V` protected by a `sync.RWMutex` is clearer and safer. Use `sync.Map` when you've profiled and confirmed it's faster for your specific access pattern, or when you're implementing a global registry that's written during initialization and read-only thereafter.
-
-## Mutex vs Channels: The Decision
-
-Here's a practical heuristic:
-
-- You're protecting a data structure that multiple goroutines read and write → **mutex**
-- You're passing data from one goroutine to another (transfer of ownership) → **channel**
-- You're signaling an event (done, cancel, ready) → **channel**
-- You're implementing a worker pool → **channels for work distribution, possibly mutex for shared state inside workers**
-
-```go
-// This is naturally a mutex job
 type RateLimiter struct {
     mu       sync.Mutex
     requests map[string]int
@@ -259,22 +139,48 @@ func (rl *RateLimiter) Allow(clientID string) bool {
     rl.mu.Lock()
     defer rl.mu.Unlock()
     // check and update rl.requests
-    ...
-}
-
-// This is naturally a channel job
-func pipeline(input <-chan Item) <-chan Result {
-    output := make(chan Result)
-    go func() {
-        defer close(output)
-        for item := range input {
-            output <- transform(item)
-        }
-    }()
-    return output
+    // ...
 }
 ```
 
-The rate limiter protects shared state (`requests` map) that multiple goroutines query and mutate. A mutex is the right fit. The pipeline passes data from one goroutine to another — channels are the natural model.
+This protects shared state (`requests` map) that multiple goroutines query and mutate. There's no ownership transfer. There's no event signaling. It's a mutex job, full stop. Compare that to a pipeline that passes data between goroutines — that's a channel job. The distinction is about what the operation *means*, not just whether there's concurrent access.
 
-Mutexes get a bad reputation for being "low-level" or "error-prone" in comparison to channels, but in Go they're straightforward to use correctly. Lock, defer unlock, do the work. The race detector catches mistakes. Keep critical sections narrow. Don't copy mutexes. That's the whole story.
+`sync.Map` is worth knowing about too, but it's not a general-purpose `map` replacement. It's optimized for two specific patterns: write-once-read-many, or goroutines operating on disjoint key sets. For everything else, `map` + `RWMutex` is clearer and type-safe.
+
+## The Gotchas
+
+**Copying a mutex.** A mutex must not be copied after first use. Copying a struct that contains a mutex copies the internal state, causing undefined behavior. Always pass mutex-containing structs by pointer. The `go vet` tool catches this with the `copylocks` checker — run it in CI.
+
+```go
+// WRONG — passed by value copies the mutex
+func processCounter(c Counter) { c.Increment() }
+
+// RIGHT — pointer receiver
+func processCounter(c *Counter) { c.Increment() }
+```
+
+**Recursive locking.** Go's `sync.Mutex` is not reentrant. If a function holding a lock calls another function that tries to acquire the same lock, it deadlocks. The pattern to avoid this: exported methods acquire the lock; unexported helper methods assume the caller holds it.
+
+```go
+// RIGHT — helpers operate without locking; callers hold the lock
+func (s *Store) Delete(key string) {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    s.deleteInternal(key) // assumes lock is held
+}
+
+func (s *Store) deleteInternal(key string) {
+    // no lock here
+    delete(s.data, key)
+}
+```
+
+**Wide critical sections.** Any slow operation inside a lock — network call, file I/O, channel operation — serializes every other goroutine waiting for that lock. Snapshot the data, release the lock, do the slow work. Keep critical sections as narrow as possible.
+
+## Key Takeaway
+
+Mutexes get a bad reputation for being "low-level" compared to channels, but in Go they're straightforward. Lock, defer unlock, do the work. The race detector catches mistakes. Keep critical sections narrow. Never copy a mutex. That's the whole story. The engineers I've seen write the cleanest concurrent Go are the ones who don't feel the need to channel-ify everything — they pick the right tool for the job. Protecting a map? Mutex. Distributing work to goroutines? Channel. The decision framework isn't complicated once you understand what each primitive is actually for.
+
+---
+
+← [Previous: select Is Elegant](/post/go/go-idioms-select) | [Course Index](/post/go/) | [Next: Table-Driven Tests](/post/go/go-idioms-table-driven-tests) →

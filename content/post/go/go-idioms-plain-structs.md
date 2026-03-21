@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: Prefer Plain Structs Over Clever Abstractions'
+title: 'Lesson 24: Prefer Plain Structs — Boring code is correct code'
 author: Atharva Pandey
 keywords:
   - Go
@@ -13,15 +13,16 @@ keywords:
 tags:
   - Go tutorial
   - golang
+series: "Idiomatic Go"
+lesson: 24
 date: '2025-11-17T00:00:00.000Z'
 ---
-s a particular brand of cleverness that feels deeply satisfying to write and deeply painful to maintain. You've probably encountered it: the `AbstractServiceProviderFactory`, the builder that returns a builder that configures a builder, the generic interface so abstract it could model anything and therefore models nothing well. Go's culture pushes back hard against this tendency.
 
-The Go community has a phrase: "clear is better than clever." It's not just a slogan — it's a design principle that shapes what idiomatic Go actually looks like in production.
+There is a particular brand of cleverness that feels deeply satisfying to write and deeply painful to maintain. The `AbstractServiceProviderFactory`. The builder that returns a builder that configures a builder. The generic interface so abstract it could model anything and therefore models nothing well. Go's culture pushes back hard against this tendency, and for good reason: I've seen more bugs traced to abstraction layers than to simple structs.
 
-## Factory Functions, Not Constructors
+## The Problem
 
-Go doesn't have constructors. You create values, not objects. When a type needs initialization logic, you write a plain function.
+The most common form of over-engineering in Go is attempting to import Java-style construction patterns. Go doesn't have constructors, so engineers invent them — and the result is code that's harder to configure, not easier:
 
 ```go
 // WRONG — trying to enforce Java-style object construction
@@ -40,11 +41,40 @@ func NewServer() *Server {
     }
 }
 
-// But what if I want a different host? The caller has to go set fields manually:
+// But what if I want a different host? The caller has to set fields manually:
 s := NewServer()
 s.host = "0.0.0.0"  // accessing unexported field — this won't even compile
 // So you add getters and setters... and now you have Java in Go
 ```
+
+The deeper failure mode is enterprise pattern fever. When this thinking scales, you get structures that exist solely to manufacture other structures:
+
+```go
+// WRONG — enterprise fever dream
+type UserRepositoryInterface interface {
+    FindByID(ctx context.Context, id string) (*User, error)
+}
+
+type UserRepositoryFactory interface {
+    CreateUserRepository() UserRepositoryInterface
+}
+
+type AbstractUserRepositoryFactory struct{}
+
+func (f *AbstractUserRepositoryFactory) CreateUserRepository() UserRepositoryInterface {
+    return &ConcreteUserRepository{}
+}
+
+type UserServiceProvider struct {
+    factory UserRepositoryFactory
+}
+```
+
+A new developer reads this for five minutes and still doesn't know what `UserServiceProvider` does. The abstraction is solving a problem that Go doesn't have.
+
+## The Idiomatic Way
+
+Accept a config struct. Apply defaults for zero values. Keep everything visible and explicit:
 
 ```go
 // RIGHT — accept a config struct, provide useful defaults
@@ -79,97 +109,12 @@ s := NewServer(ServerConfig{
 })
 ```
 
-The config struct approach is readable, doesn't require documentation to understand, and lets callers provide exactly what they need while getting sensible defaults for the rest.
+Readable. Self-documenting. No documentation needed to understand what each field does.
 
-## The Functional Options Pattern — and When It's Actually Worth It
-
-Functional options are a popular Go pattern. The idea is to pass option functions that configure a value:
+For the factory problem, strip the abstractions and use the concrete type directly:
 
 ```go
-type Option func(*Server)
-
-func WithHost(host string) Option {
-    return func(s *Server) { s.config.Host = host }
-}
-
-func WithPort(port int) Option {
-    return func(s *Server) { s.config.Port = port }
-}
-
-func NewServer(opts ...Option) *Server {
-    s := &Server{config: ServerConfig{
-        Host:    "localhost",
-        Port:    8080,
-        Timeout: 30 * time.Second,
-    }}
-    for _, opt := range opts {
-        opt(s)
-    }
-    return s
-}
-
-// Usage:
-s := NewServer(WithHost("0.0.0.0"), WithPort(9090))
-```
-
-This pattern is legitimate and well-suited to specific situations. It shines when:
-
-- The type is part of a library and you can't predict all configuration needs at the time you write it
-- You need to add configuration options without breaking existing callers
-- Some options are computed or conditional in ways that don't fit neatly into a struct literal
-
-But be honest about when you actually need it. For an internal server type used in two places, a plain config struct is clearer. Functional options add indirection. Each option is a closure. The caller can't see all available options without reading the docs. For internal code, that cost rarely pays off.
-
-```go
-// WRONG — functional options for a simple internal type
-// Nothing here justifies the added complexity
-type dbPool struct{ maxConns int; timeout time.Duration }
-
-type DBOption func(*dbPool)
-func WithMaxConns(n int) DBOption { return func(p *dbPool) { p.maxConns = n } }
-func WithTimeout(d time.Duration) DBOption { return func(p *dbPool) { p.timeout = d } }
-
-func NewDBPool(opts ...DBOption) *dbPool { ... }
-
-// RIGHT — just use a struct
-type DBPoolConfig struct {
-    MaxConns int
-    Timeout  time.Duration
-}
-func NewDBPool(cfg DBPoolConfig) *dbPool { ... }
-```
-
-## Avoiding Enterprise Patterns
-
-Go is not Java. The patterns that manage complexity in large Java codebases — dependency injection frameworks, abstract factory hierarchies, service locators — solve problems Go doesn't have in the same way.
-
-```go
-// WRONG — enterprise fever dream
-type UserRepositoryInterface interface {
-    FindByID(ctx context.Context, id string) (*User, error)
-}
-
-type UserRepositoryFactory interface {
-    CreateUserRepository() UserRepositoryInterface
-}
-
-type AbstractUserRepositoryFactory struct{}
-
-func (f *AbstractUserRepositoryFactory) CreateUserRepository() UserRepositoryInterface {
-    return &ConcreteUserRepository{}
-}
-
-type UserServiceProvider struct {
-    factory UserRepositoryFactory
-}
-
-func NewUserServiceProvider(factory UserRepositoryFactory) *UserServiceProvider {
-    return &UserServiceProvider{factory: factory}
-}
-```
-
-```go
-// RIGHT — just use the concrete type, define an interface only when you need polymorphism
+// RIGHT — just use the concrete type
 type UserRepository struct {
     db *sql.DB
 }
@@ -183,7 +128,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*User, error)
 }
 ```
 
-If you later need to mock `UserRepository` for testing, define a narrow interface at the point of use:
+If you need to mock `UserRepository` for testing, define a narrow interface at the point of use — not in the repository's own package:
 
 ```go
 // In the package that needs it, not in the repository package
@@ -192,11 +137,29 @@ type userFinder interface {
 }
 ```
 
-This is the Go idiom: accept interfaces, return concrete types. Define the interface where it's consumed, keep it narrow, and don't create it until you need it.
+This is the Go idiom: accept interfaces, return concrete types. Define the interface where it's consumed. Keep it narrow. Don't create it until you actually need the polymorphism.
 
-## A Refactoring: From Over-Engineered to Simple
+The functional options pattern is legitimate, but it has a real cost. Use it for library code that can't predict all configuration needs upfront, or when you need to add options without breaking existing callers. Don't reach for it by default:
 
-Here's a realistic before-and-after. Suppose you inherited this:
+```go
+// WRONG — functional options for a simple internal type
+type DBOption func(*dbPool)
+func WithMaxConns(n int) DBOption { return func(p *dbPool) { p.maxConns = n } }
+func WithTimeout(d time.Duration) DBOption { return func(p *dbPool) { p.timeout = d } }
+
+// RIGHT — just use a struct
+type DBPoolConfig struct {
+    MaxConns int
+    Timeout  time.Duration
+}
+func NewDBPool(cfg DBPoolConfig) *dbPool { ... }
+```
+
+Functional options add indirection. Each option is a closure. Callers can't see all available options without reading docs or searching for `With*` functions. For internal code used in a handful of places, that cost almost never pays off.
+
+## In The Wild
+
+Here's a realistic before-and-after. You inherit this notification service:
 
 ```go
 // BEFORE — too clever
@@ -233,7 +196,7 @@ func (s *NotificationService) Send(ctx context.Context, channel string, msg Mess
 }
 ```
 
-Now the refactored version:
+Refactored:
 
 ```go
 // AFTER — direct and explicit
@@ -265,14 +228,20 @@ svc := NewNotificationService(map[string]Notifier{
 })
 ```
 
-Forty lines became fifteen. The behavior is identical. The intent is clearer. There's no factory factory, no Register method to call, no ordering dependency in setup code. A new developer can read this in thirty seconds.
+Forty lines became fifteen. Identical behavior. No factory factory. No `Register` method to call in the right order. A new developer reads it in thirty seconds.
 
-## The Boring Technology Advantage
+## The Gotchas
 
-The "boring technology" argument — made famous in infrastructure circles but equally applicable to code design — is that boring, predictable, well-understood solutions carry less risk than clever ones. They're easier to debug at 2am. They're easier to hand off. They survive team turnover.
+**Hiding state behind unexported fields you can't initialize.** If your struct's zero value is broken and your `New*` function is the only way to create a valid instance, make sure that function is discoverable. Document the invariant. Unexported fields with no public constructor leave callers writing invalid zero values and wondering why things panic.
 
-Go's plain struct pattern is boring technology. It's `struct{ fields }` and `func New(cfg Config) *Thing`. It has no magic. That's exactly the point.
+**Prematurely extracting interfaces.** Defining `UserRepositoryInterface` before you have a second implementation is speculative abstraction. You're guessing about a future requirement. Write the concrete type. Extract the interface if and when you actually need the substitution.
 
-The instinct to reach for abstraction often comes from good intentions — you want the code to be flexible, extensible, elegant. But flexibility you don't need is complexity you have to maintain. Add abstraction when the concrete problem in front of you demands it, not in anticipation of problems you might someday have.
+**Config structs that grow unbounded.** A `ServerConfig` with 20 fields is a code smell. It usually means the type is doing too many things. Split the type before splitting the config struct.
 
-Write the plain struct first. Refactor toward the pattern when the code tells you it needs it — not before.
+## Key Takeaway
+
+The "boring technology" argument — that boring, predictable, well-understood solutions carry less risk than clever ones — applies just as much to code design as to infrastructure choices. Plain structs are boring. `struct{ fields }` and `func New(cfg Config) *Thing` have no magic. That's exactly the point. Flexibility you don't need is complexity you have to maintain. Write the plain struct first. Add the functional options or the interface when the code tells you it needs them — not in anticipation of problems you might someday have. The instinct to add abstraction comes from good intentions, but in Go, the clearest code is usually the most correct code.
+
+---
+
+← [Lesson 23: Error Values, Not Exceptions](/post/go/go-idioms-error-values) | [Course Index](/post/go/) | [Lesson 25: Simplicity Is a Language Feature](/post/go/go-idioms-simplicity) →

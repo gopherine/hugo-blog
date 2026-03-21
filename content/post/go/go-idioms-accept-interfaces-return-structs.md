@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: Accept Interfaces, Return Structs'
+title: 'Lesson 6: Accept Interfaces, Return Structs — Flexibility in, certainty out'
 author: Atharva Pandey
 keywords:
   - Go
@@ -12,17 +12,16 @@ keywords:
 tags:
   - Go tutorial
   - golang
+series: "Idiomatic Go"
+lesson: 6
 date: '2025-04-07T00:00:00.000Z'
 ---
-"I don't care what concrete type you hand me, as long as it satisfies this contract." That opens the door to substitution — you can pass a real database connection, a mock, a test double, or something that did not exist when you wrote the function.
 
-**Returning a concrete struct** says: "I am giving you the real thing, with all of its methods and fields exposed." The caller gets the full picture. Nothing is hidden behind an abstraction.
+Here's a mistake I see in almost every Go codebase written by people coming from Java or C#: they accept concrete types everywhere and return interfaces from constructors. It feels "enterprise-y". It's actually backwards. The idiomatic Go version is the opposite — accept the smallest interface that does the job, return the richest concrete type you have.
 
-Flipping those two decisions — accepting concrete types and returning interfaces — is a surprisingly common mistake, and it causes real pain.
+## The Problem
 
-## The Wrong Way: Accepting Concrete Types
-
-Suppose you are writing a function that processes log lines from some source.
+Most of the pain comes from accepting concrete types. Once you lock a function to a specific concrete type, every caller that doesn't have exactly that type is stuck. Tests become integration tests. Swapping implementations requires rewriting functions. And the function itself becomes harder to compose.
 
 ```go
 // WRONG: accepting a concrete type locks callers in
@@ -38,11 +37,27 @@ func ProcessLogs(f *os.File) error {
 }
 ```
 
-This looks innocent. But now your tests have a problem: to call `ProcessLogs` in a test, you must create a real `*os.File`. That means writing a temporary file to disk, opening it, and cleaning it up. Your unit test just became an integration test. Worse, if you later want to process logs from an HTTP response body or an in-memory buffer, you have to rewrite the function.
+This looks completely innocent, but it's a trap. To test `ProcessLogs` you must create a real `*os.File` — write a temp file to disk, open it, and clean it up after. Your unit test just became an integration test that touches the filesystem. Tomorrow when you need to process logs streamed from an HTTP response body, you have to rewrite the function. And if you want to test the unhappy path with a reader that returns an error halfway through? Good luck constructing that with a real file.
 
-## The Right Way: Accept io.Reader
+The second half of this mistake is returning interfaces from constructors:
 
-The standard library already defined the abstraction you need. An `io.Reader` is anything with a `Read(p []byte) (n int, err error)` method — files, network connections, `bytes.Buffer`, `strings.Reader`, gzip readers, you name it.
+```go
+// WRONG: returning an interface hides methods the caller might need
+type Store interface {
+    Get(key string) (string, error)
+    Set(key string, value string) error
+}
+
+func NewRedisStore(addr string) Store {
+    return &redisStore{client: redis.NewClient(&redis.Options{Addr: addr})}
+}
+```
+
+The `redisStore` underneath almost certainly has `Close()`, `Ping()`, maybe `FlushAll()` for tests. By returning `Store`, you've thrown those away. Now callers who need `Close` have to do a type assertion to get back what you hid from them — coupling themselves to the concrete type anyway, with extra friction added.
+
+## The Idiomatic Way
+
+For inputs: find the narrowest interface that covers what your function actually needs. The standard library already did this work for the most common cases.
 
 ```go
 // RIGHT: accepting an interface unlocks substitution
@@ -58,7 +73,7 @@ func ProcessLogs(r io.Reader) error {
 }
 ```
 
-Now your test looks like this:
+`io.Reader` is just one method: `Read(p []byte) (n int, err error)`. Files satisfy it, network connections satisfy it, `bytes.Buffer` satisfies it, `strings.Reader` satisfies it, gzip readers satisfy it. Now your test looks like this:
 
 ```go
 func TestProcessLogs(t *testing.T) {
@@ -69,40 +84,9 @@ func TestProcessLogs(t *testing.T) {
 }
 ```
 
-No files. No disk I/O. No cleanup. And if tomorrow you need to process logs from an S3 object stream, you pass the HTTP response body directly — the function does not change at all.
+No files. No disk I/O. No cleanup. And when the requirements change to reading from S3, you pass the HTTP response body and nothing in `ProcessLogs` changes at all.
 
-## The Wrong Way: Returning an Interface
-
-Now consider the opposite mistake. Suppose you have a constructor that returns an interface.
-
-```go
-// WRONG: returning an interface hides methods the caller might need
-type Store interface {
-    Get(key string) (string, error)
-    Set(key string, value string) error
-}
-
-func NewRedisStore(addr string) Store {
-    return &redisStore{client: redis.NewClient(&redis.Options{Addr: addr})}
-}
-```
-
-The `redisStore` struct probably has a `Close() error` method, a `Ping() error` method for health checks, and maybe a `FlushAll() error` that is useful in tests. By returning `Store`, you have thrown those away. The caller has to do an ugly type assertion to get them back:
-
-```go
-s := NewRedisStore("localhost:6379")
-// Can't call s.Close() — it's not on the Store interface
-// Have to do this:
-if rs, ok := s.(*redisStore); ok {
-    rs.Close()
-}
-```
-
-That type assertion couples the caller to the concrete type anyway — you got none of the benefit of returning an interface, and you added friction.
-
-## The Right Way: Return the Concrete Struct
-
-Return the struct. Let the caller decide which interface to hold it in.
+For outputs: return the concrete struct and let the caller decide what interface to hold it through.
 
 ```go
 // RIGHT: return the concrete type with all its capabilities exposed
@@ -111,24 +95,24 @@ func NewRedisStore(addr string) *RedisStore {
 }
 ```
 
-Now the caller that only needs `Store` behavior can hold it as `Store`:
+Now the caller who only needs `Store` behavior can assign it:
 
 ```go
 var s Store = NewRedisStore("localhost:6379")
 ```
 
-And the caller that needs `Close` can call it directly:
+And the caller who needs `Close` can just call it:
 
 ```go
 rs := NewRedisStore("localhost:6379")
 defer rs.Close()
 ```
 
-No type assertions. No hidden methods. The interface is defined at the point of use, not at the point of construction.
+No type assertions. No hidden capabilities. The interface gets defined at the point of use, not at the point of construction — which is exactly where it belongs.
 
-## A Real-World Scenario: HTTP Handlers
+## In The Wild
 
-This pattern shows up constantly in HTTP handler design. A handler that fetches users from a database is a perfect example.
+HTTP handlers are where this pattern shows up most visibly. Here's a handler that fetches users from a database:
 
 ```go
 // WRONG: tightly coupled to a concrete database type
@@ -143,10 +127,10 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-Testing this requires a real database. Switching to a different storage layer requires rewriting the handler. Compare with the interface-accepting version:
+Testing this requires a real database. Switching from Postgres to a read-through cache requires rewriting the handler. Contrast that with the interface version:
 
 ```go
-// RIGHT: depends on a behavior, not an implementation
+// RIGHT: depends on behavior, not an implementation
 type UserStore interface {
     GetUser(id string) (*User, error)
 }
@@ -166,28 +150,22 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-Your test creates a mock `UserStore` in five lines. Your production code wires in the real SQL implementation. The handler never knows the difference.
+Your test creates a mock `UserStore` in five lines. Your production code wires in the real SQL implementation. The handler genuinely doesn't know the difference. This is the whole point.
 
-## The Standard Library Agrees
+Look at the standard library and you'll see it consistently: `json.NewEncoder` accepts `io.Writer`. `bufio.NewReader` accepts `io.Reader`. `http.NewRequest` accepts `io.Reader` for the body. Maximum flexibility on the input side. And what do they return? `*json.Encoder`, `*bufio.Reader` — concrete types with all their methods exposed. This wasn't an accident.
 
-Look at how the standard library itself is designed. `json.NewEncoder` accepts `io.Writer`. `bufio.NewReader` accepts `io.Reader`. `http.NewRequest` accepts `io.Reader` for the body. These functions are maximally flexible because they take the smallest interface that satisfies their needs.
+## The Gotchas
 
-But what do they *return*? Concrete types. `json.NewEncoder` returns `*json.Encoder`, not some `Encoder` interface. `bufio.NewReader` returns `*bufio.Reader`. You get the full struct with all its methods — `Peek`, `ReadLine`, `ReadBytes` — not just the subset that was anticipated at design time.
+**Defining interfaces in the producer package.** If you define `RedisStoreInterface` in the same package as `RedisStore`, you've already tied the interface to the implementation. Define interfaces where they're consumed — in the package that needs the behavior — not where the types live.
 
-This is not an accident. The Go authors made this choice deliberately, and the standard library is vastly more useful because of it.
+**Interfaces that are too wide.** There's a temptation to define one big `Repository` interface with twelve methods and use it everywhere. Resist this. If a function only needs to read one user, it should accept an interface with one method. Wide interfaces make mocking painful and force implementors to carry methods they'd never otherwise provide.
 
-## When Returning an Interface Is Acceptable
+**The `error` interface is the exception, not the template.** `error` is an interface return type, but it's the textbook example of a case where the concrete type genuinely doesn't matter to most callers. When you find yourself reaching for interface return types "because error does it," ask whether your callers actually want to be shielded from the concrete type or whether they're going to need it.
 
-There are genuine exceptions. The most common is when you explicitly need to express that the return value might be one of several unrelated concrete types and the caller should only use the common interface. `error` is the canonical example — you return the `error` interface because the concrete error type is often irrelevant or implementation-specific.
+## Key Takeaway
 
-Factory functions that produce different backends based on a configuration string are another case: `database/sql.Open` returns `*sql.DB` (a struct), but if you were writing a driver registry that could return fundamentally different client types, an interface return might be justified.
+The rule is symmetrical: on the input side, interfaces make your functions flexible — the weaker the constraint, the more callers can pass something useful. On the output side, concrete types make your functions honest — you're handing over the full thing, not a restricted view. Together, these two decisions produce Go code that's easy to test because you can always swap inputs, easy to extend because callers get everything your type offers, and easy to read because there are no surprise type assertions. The standard library has followed this principle from day one. When you adopt it, your code starts to feel like it belongs alongside the packages you're already importing.
 
-The rule of thumb holds for the vast majority of application code: keep the interface on the input side where it gives flexibility, and keep the concrete type on the output side where it exposes capability.
+---
 
-## Putting It Together
-
-The principle is simple once you internalize the reasoning. Parameters are constraints you impose on callers — the weaker the constraint, the more callers you can accept. Return values are promises you make to callers — the richer the promise, the more useful you are.
-
-Accepting interfaces keeps your code open to substitution. Returning structs keeps your code honest about what it produces. Those two choices together produce Go code that is genuinely easy to test, easy to extend, and easy to read a year later when you have forgotten what you were thinking.
-
-Next time you write a constructor or a utility function, ask yourself: am I accepting the narrowest interface that satisfies my needs? Am I returning the richest concrete type I have? If the answer to both is yes, you are writing idiomatic Go.
+← [Lesson 5: Implicit Interfaces](/post/go/go-idioms-implicit-interfaces/) | [Course Index](#) | [Lesson 7: Slices Are Views →](/post/go/go-idioms-slices-are-views/)

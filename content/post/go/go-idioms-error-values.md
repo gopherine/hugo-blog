@@ -1,5 +1,5 @@
 ---
-title: 'Go Idioms: Error Values, Not Exceptions'
+title: 'Lesson 23: Error Values, Not Exceptions — Errors you can actually inspect'
 author: Atharva Pandey
 keywords:
   - Go
@@ -14,27 +14,16 @@ keywords:
 tags:
   - Go tutorial
   - golang
+series: "Idiomatic Go"
+lesson: 23
 date: '2025-07-28T00:00:00.000Z'
 ---
-t happen, thrown up the call stack and caught somewhere above. Go rejects this model entirely. In Go, an error is a value, just like an integer or a string. You pass it around, you inspect it, you wrap it with context, and you check it right where it happens.
 
-This forces a different relationship with failure. You can't ignore it without an explicit decision to do so. You can't let it silently propagate past ten function calls. Error handling is visible, which makes it honest.
+In most languages, errors are events — they get thrown, they propagate up the call stack, and you catch them somewhere above. Go rejects this model entirely. In Go, an error is a value, just like an integer or a string. You pass it around, inspect it, wrap it with context, and check it right where it happens. Ignore it and your code doesn't crash loudly; it quietly does the wrong thing, and you'll find out at the worst possible moment.
 
-## The Error Interface
+## The Problem
 
-Everything in Go's error system is built on a single interface:
-
-```go
-type error interface {
-    Error() string
-}
-```
-
-Any type that implements this interface is an error. That's it. The simplicity is intentional — it means you can make errors carry any information you want, as long as they know how to describe themselves as a string.
-
-## Custom Error Types
-
-The most basic custom error is a string wrapped in a type. The `errors.New` and `fmt.Errorf` functions cover the common cases, but when you need to carry structured data, you implement the interface yourself.
+The worst error handling in Go looks like this: errors that carry no structure and can't be distinguished by the caller except by matching strings.
 
 ```go
 // WRONG — error messages with no structure, impossible to inspect programmatically
@@ -51,6 +40,14 @@ func fetchUser(id int) (*User, error) {
 
 // Caller has no way to distinguish "invalid id" from "db down" except string matching
 ```
+
+The `%v` verb is the subtle killer here. It formats the original error as a string and discards its type. If the database returns `sql.ErrNoRows`, you've thrown that information away. The caller can't call `errors.Is` against it. They're stuck doing fragile string comparisons or treating every error as fatal.
+
+The second failure mode is wrapping without substance. `fmt.Errorf("error: %w", err)` adds noise and no context. Every layer should explain what operation failed and with what inputs.
+
+## The Idiomatic Way
+
+Errors should carry structure. Build types that implement the `error` interface and carry data the caller can use to make decisions:
 
 ```go
 // RIGHT — structured error types the caller can inspect
@@ -87,32 +84,17 @@ func fetchUser(id int) (*User, error) {
 }
 ```
 
-Now the caller can make decisions based on what kind of error occurred, not just what the error message says.
-
-## Sentinel Errors
-
-A sentinel error is a package-level error value that callers check against. The standard library uses them extensively: `io.EOF`, `sql.ErrNoRows`, `http.ErrNoCookie`. They're the simplest form of error that a caller can specifically handle.
+For simpler cases where you just need a distinguishable signal, sentinel errors are the right tool — package-level error values that callers check against. The standard library uses them everywhere: `io.EOF`, `sql.ErrNoRows`, `http.ErrNoCookie`.
 
 ```go
 var (
-    ErrNotFound    = errors.New("not found")
+    ErrNotFound     = errors.New("not found")
     ErrUnauthorized = errors.New("unauthorized")
     ErrInvalidInput = errors.New("invalid input")
 )
-
-func getItem(id string) (*Item, error) {
-    if id == "" {
-        return nil, ErrInvalidInput
-    }
-    item, ok := store[id]
-    if !ok {
-        return nil, ErrNotFound
-    }
-    return item, nil
-}
 ```
 
-Callers compare against the sentinel using `errors.Is`:
+Use `errors.Is` to check sentinels — never `==`. `errors.Is` walks the entire error chain, so wrapping doesn't break it:
 
 ```go
 item, err := getItem(id)
@@ -120,48 +102,25 @@ if errors.Is(err, ErrNotFound) {
     http.Error(w, "not found", http.StatusNotFound)
     return
 }
-if errors.Is(err, ErrInvalidInput) {
-    http.Error(w, "bad request", http.StatusBadRequest)
+```
+
+Use `errors.As` when you need data from the error, not just a match:
+
+```go
+var apiErr *APIError
+if errors.As(err, &apiErr) {
+    w.WriteHeader(apiErr.StatusCode)
+    json.NewEncoder(w).Encode(map[string]string{
+        "code":    apiErr.Code,
+        "message": apiErr.Message,
+    })
     return
 }
 ```
 
-## Wrapping Errors with %w
-
-When you add context to an error, use `%w` instead of `%v`. The `%w` verb wraps the original error in the new one, preserving the full chain. `%v` just formats the error as a string, discarding the type information.
+`errors.As` also walks the chain. Implement `Unwrap() error` on your custom types to make the chain traversable:
 
 ```go
-// WRONG — %v breaks the error chain
-func processOrder(orderID string) error {
-    if err := validateOrder(orderID); err != nil {
-        return fmt.Errorf("order validation failed: %v", err)
-        // Original error is now just a string, errors.Is/As can't inspect it
-    }
-    return nil
-}
-
-// RIGHT — %w preserves the chain
-func processOrder(orderID string) error {
-    if err := validateOrder(orderID); err != nil {
-        return fmt.Errorf("processOrder %s: %w", orderID, err)
-        // Caller can still use errors.Is(err, ErrInvalidInput) through the chain
-    }
-    return nil
-}
-```
-
-The convention for the wrapper message is `"functionName: context"` — lowercase, no trailing period. It reads naturally when multiple layers stack up: `"processPayment: processOrder abc123: validateOrder: invalid input"`.
-
-## errors.Is vs errors.As
-
-These two functions handle the two common inspection cases.
-
-`errors.Is` checks if any error in the chain matches a specific value. Use it for sentinel errors.
-
-`errors.As` checks if any error in the chain matches a specific type, and if so, fills a pointer with that value. Use it for structured errors where you need the fields.
-
-```go
-// Building an error hierarchy for an API
 type APIError struct {
     StatusCode int
     Code       string
@@ -174,22 +133,36 @@ func (e *APIError) Error() string {
 }
 
 func (e *APIError) Unwrap() error {
-    return e.Cause  // enables errors.Is/As to look deeper
+    return e.Cause
 }
+```
 
-// Somewhere deep in the call stack:
-func chargeCard(amount int) error {
-    if amount > maxCharge {
-        return &APIError{
-            StatusCode: 422,
-            Code:       "CHARGE_LIMIT_EXCEEDED",
-            Message:    fmt.Sprintf("amount %d exceeds maximum %d", amount, maxCharge),
-        }
+The wrapping convention for `%w`: `"functionName: context"` — lowercase, no trailing period. It reads naturally when layers stack up: `"processPayment: processOrder abc123: validateOrder: invalid input"`.
+
+## In The Wild
+
+An HTTP checkout handler that needs to surface structured errors from several layers down the call stack:
+
+```go
+// WRONG — using %v and throwing away the type
+func processOrder(orderID string) error {
+    if err := validateOrder(orderID); err != nil {
+        return fmt.Errorf("order validation failed: %v", err)
+        // errors.Is/As can no longer inspect the original
+    }
+    return nil
+}
+```
+
+```go
+// RIGHT — %w preserves the chain all the way up
+func processOrder(orderID string) error {
+    if err := validateOrder(orderID); err != nil {
+        return fmt.Errorf("processOrder %s: %w", orderID, err)
     }
     return nil
 }
 
-// HTTP handler at the top of the stack:
 func handleCheckout(w http.ResponseWriter, r *http.Request) {
     err := processCheckout(r.Context())
     if err == nil {
@@ -199,7 +172,6 @@ func handleCheckout(w http.ResponseWriter, r *http.Request) {
 
     var apiErr *APIError
     if errors.As(err, &apiErr) {
-        // We got our structured error even if it was wrapped several layers deep
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(apiErr.StatusCode)
         json.NewEncoder(w).Encode(map[string]string{
@@ -209,53 +181,25 @@ func handleCheckout(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Unknown error — don't leak internals
     log.Printf("unexpected error during checkout: %v", err)
     http.Error(w, "internal server error", http.StatusInternalServerError)
 }
 ```
 
-The `Unwrap() error` method is what makes the chain work. When `errors.Is` or `errors.As` traverses the chain, it calls `Unwrap()` at each step until it finds what it's looking for or runs out of chain.
+The structured error travels from `chargeCard` through `processOrder` through `processCheckout` wrapped in context at each layer — and the HTTP handler at the top can still extract the `StatusCode` and `Code` fields. That's the chain working as designed.
 
-## Why Panic Is Not Error Handling
+## The Gotchas
 
-Go has `panic` and `recover`. New Go programmers sometimes use them as a substitute for exceptions, which is almost always wrong.
+**`panic` is not error handling.** New Go developers sometimes use `panic` as a substitute for exceptions. It's almost always wrong. Panic is for programmer errors — index out of bounds, nil pointer dereference when you guaranteed the pointer was valid, calling a function with violated preconditions. For everything else — network failures, missing files, invalid input, timeouts — return an error and give the caller the choice of how to respond.
 
-```go
-// WRONG — using panic for ordinary error conditions
-func parseConfig(path string) Config {
-    data, err := os.ReadFile(path)
-    if err != nil {
-        panic(fmt.Sprintf("cannot read config: %v", err))
-        // Caller now has to wrap this in a recover() just to get an error back
-    }
-    // ...
-}
-```
+**Logging and returning.** Pick one. If you log the error, handle it. If you return it, let the caller log it. Doing both means every error gets logged twice and your logs become noise.
 
-```go
-// RIGHT — return an error, let the caller decide what to do
-func parseConfig(path string) (Config, error) {
-    data, err := os.ReadFile(path)
-    if err != nil {
-        return Config{}, fmt.Errorf("parseConfig: %w", err)
-    }
-    var cfg Config
-    if err := json.Unmarshal(data, &cfg); err != nil {
-        return Config{}, fmt.Errorf("parseConfig: invalid JSON in %s: %w", path, err)
-    }
-    return cfg, nil
-}
-```
+**Wrapping without substance.** `fmt.Errorf("error: %w", err)` adds noise. Include the operation name and the relevant inputs at each layer. "fetchUser 42: database error" builds a useful narrative; "error" does not.
 
-Panic is for programmer errors — the kind that should never happen in a correct program. Index out of bounds. Nil pointer dereference when you guaranteed the pointer was valid. Calling a function with preconditions you violated. These are bugs, not errors.
+## Key Takeaway
 
-For everything else — network failures, missing files, invalid input, database errors, timeouts — return an error. Give the caller the choice of how to respond.
+Go's error model treats errors as first-class information, not invisible exceptions. When you build structured error types, you're documenting failure modes as explicitly as you document the happy path. When you wrap errors with `%w`, you're building a narrative: what failed, why it failed, and where in the call stack the failure was detected — all in a form your code can programmatically inspect. That's worth the verbosity. Languages with exceptions tell you *where* something exploded via a stack trace; a well-designed Go error chain tells you *what* failed and *why*, in a form your monitoring, your handlers, and your tests can all act on.
 
-## Errors Are Information
+---
 
-The deeper point about Go's error model is that it treats errors as first-class information about what went wrong. When you return a structured error type, you're documenting failure modes as explicitly as you document the happy path. When you wrap errors with context, you're building a narrative about where the failure occurred and why.
-
-Languages with exceptions can obscure this. A stack trace tells you *where* something exploded, but a well-designed Go error chain tells you *what* failed, *why* it failed, and *where in the logic* the failure was detected — all in a form your code can programmatically inspect and act on.
-
-That's worth a bit of verbosity.
+← [Lesson 22: Small Packages Win](/post/go/go-idioms-small-packages) | [Course Index](/post/go/) | [Lesson 24: Prefer Plain Structs](/post/go/go-idioms-plain-structs) →
