@@ -9,6 +9,8 @@ keywords:
   - closures
   - functions
   - Golang
+series: "Go from Scratch"
+lesson: 3
 tags:
   - go
 date: 2024-03-04T18:30:00.000Z

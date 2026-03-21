@@ -27,6 +27,8 @@ keywords:
   - Rust language quick reference
   - Rust coding shortcuts
   - Comprehensive Rust guide
+series: "Rust in Practice"
+lesson: 3
 tags:
   - rust
   - rust tutorial

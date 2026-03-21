@@ -4,6 +4,8 @@ author: Atharva Pandey
 keywords:
   - Go training
   - Go
+series: "Go from Scratch"
+lesson: 1
 tags:
   - Go tutorial
   - Go

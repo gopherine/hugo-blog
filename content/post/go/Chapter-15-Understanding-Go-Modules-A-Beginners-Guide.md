@@ -5,6 +5,8 @@ keywords:
   - Turorial
   - Go
   - Go modules
+series: "Go from Scratch"
+lesson: 2
 tags:
   - Golang
 date: 2024-03-04T18:30:00.000Z

@@ -5,6 +5,8 @@ keywords:
   - Echo
   - Golang
   - Web server
+series: "Go from Scratch"
+lesson: 5
 tags:
   - Golang
 date: 2024-03-10T18:30:00.000Z

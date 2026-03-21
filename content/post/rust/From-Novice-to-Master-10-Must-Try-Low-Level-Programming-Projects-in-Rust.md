@@ -8,6 +8,8 @@ keywords:
   - rust project ideas
   - rust project
   - 10 Must-Try Low-Level Programming Projects in Rust
+series: "Rust in Practice"
+lesson: 4
 tags:
   - rust
   - rust tutorial

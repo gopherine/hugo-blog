@@ -7,6 +7,8 @@ keywords:
   - traits rust tutorial
   - rust traits
   - rust programming
+series: "Rust Traits Deep Dive"
+lesson: 1
 tags:
   - rust
   - rust tutorial

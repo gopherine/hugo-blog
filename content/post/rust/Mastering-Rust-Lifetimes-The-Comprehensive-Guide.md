@@ -18,6 +18,8 @@ keywords:
   - Rust Struct Lifetimes
   - Rust Lifetime Parameters
   - Safe Rust Coding
+series: "Rust in Practice"
+lesson: 1
 tags:
   - rust
   - rust tutorial

@@ -7,6 +7,8 @@ keywords:
   - connect database with sqlc
   - database connectivity with sqlc
   - Go
+series: "Go from Scratch"
+lesson: 6
 tags:
   - postgres
   - sqlc

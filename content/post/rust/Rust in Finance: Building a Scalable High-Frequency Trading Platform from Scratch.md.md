@@ -28,6 +28,8 @@ keywords:
   - Advanced Rust programming techniques
   - Real-time data processing Rust
   - Rust for financial data analysis
+series: "Rust in Practice"
+lesson: 5
 tags:
   - rust
   - software architecture

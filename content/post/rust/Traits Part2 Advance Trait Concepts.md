@@ -9,6 +9,8 @@ keywords:
   - rust advanced traits
   - learn rust
   - rust traits
+series: "Rust Traits Deep Dive"
+lesson: 2
 tags:
   - rust
   - rust tutorial

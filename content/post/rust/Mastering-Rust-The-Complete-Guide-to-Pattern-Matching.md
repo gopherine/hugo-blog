@@ -12,6 +12,8 @@ keywords:
   - Rust Enums and Structs
   - Advanced Rust Techniques
   - Rust Pattern Matching
+series: "Rust in Practice"
+lesson: 2
 tags:
   - rust
   - rust tutorial
