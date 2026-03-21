@@ -243,3 +243,81 @@ body {
     display: none;
   }
 }
+
+/* Tab system */
+.homepage-tabs .UnderlineNav {
+  border-bottom: 1px solid var(--color-border-primary);
+  margin-bottom: 16px;
+}
+
+.homepage-tabs .UnderlineNav-body {
+  display: flex;
+  gap: 0;
+}
+
+.homepage-tabs .UnderlineNav-item {
+  padding: 8px 16px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.homepage-tabs .UnderlineNav-item[aria-current="page"] {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  border-bottom-color: #6f42c1;
+}
+
+.homepage-tabs .UnderlineNav-item:hover {
+  color: var(--color-text-primary);
+}
+
+@media (max-width: 768px) {
+  .homepage-tabs .UnderlineNav-body {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Feed items */
+.feed-item { border-radius: 6px; }
+
+.feed-label {
+  display: inline-block;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  border-radius: 2em;
+  color: #fff;
+}
+
+.feed-label--thought { background-color: #6f42c1; }
+.feed-label--shipped { background-color: #28a745; }
+.feed-label--article { background-color: #0366d6; }
+
+.feed-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 2em;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  margin-right: 4px;
+}
+
+.feed-item--pinned {
+  border-color: #6f42c1;
+  border-width: 2px;
+}
+
+.pinned-badge {
+  font-size: 11px;
+  color: #6f42c1;
+  font-weight: 600;
+}

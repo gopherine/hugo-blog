@@ -323,3 +323,25 @@ function setRelativeTime() {
     elem.setAttribute('title', new Date(dateStr).toLocaleString());
   });
 }
+
+// Tab switching
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(function(el) {
+    el.style.display = 'none';
+  });
+  document.querySelectorAll('.UnderlineNav-item').forEach(function(el) {
+    el.removeAttribute('aria-current');
+  });
+  var target = document.querySelector('[data-tab-content="' + tabName + '"]');
+  if (target) target.style.display = 'block';
+  var tab = document.querySelector('[data-tab="' + tabName + '"]');
+  if (tab) tab.setAttribute('aria-current', 'page');
+  history.replaceState(null, '', '#' + tabName);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var hash = window.location.hash.replace('#', '');
+  if (hash === 'articles') {
+    switchTab('articles');
+  }
+});
