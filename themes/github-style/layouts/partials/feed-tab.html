@@ -116,6 +116,11 @@
     {{ end }}
   {{ end }}
 
+  {{/* Show more button for feed */}}
+  <div class="text-center mt-3 mb-3" id="feed-show-more">
+    <button class="btn">Show more</button>
+  </div>
+
   {{/* Contribution graph (from old overview.html lines 88-154) */}}
   {{ $section := where .Site.RegularPages "Section" "in" (slice "post") }}
   <div class="mt-4 position-relative" id="contributions" data='[{{ range $index, $elem := $section }}{

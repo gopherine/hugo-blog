@@ -344,7 +344,33 @@ document.addEventListener('DOMContentLoaded', function() {
   if (hash === 'articles') {
     switchTab('articles');
   }
+  // Initialize pagination
+  paginateItems('.feed-item:not(.feed-item--pinned)', 5, 'feed-show-more');
+  paginateItems('.article-card', 5, 'articles-show-more');
 });
+
+// Pagination — show first N items, hide rest, "Show more" loads next batch
+function paginateItems(selector, pageSize, btnId) {
+  var items = document.querySelectorAll(selector);
+  var shown = pageSize;
+  items.forEach(function(item, i) {
+    if (i >= pageSize) item.style.display = 'none';
+  });
+  var btn = document.getElementById(btnId);
+  if (btn) {
+    if (items.length <= pageSize) {
+      btn.style.display = 'none';
+    }
+    btn.querySelector('button').addEventListener('click', function() {
+      var next = shown + pageSize;
+      items.forEach(function(item, i) {
+        if (i < next) item.style.display = '';
+      });
+      shown = next;
+      if (shown >= items.length) btn.style.display = 'none';
+    });
+  }
+}
 
 // Article tag filtering
 function filterArticles(tag, btn) {
@@ -354,10 +380,12 @@ function filterArticles(tag, btn) {
   btn.classList.add('tag-pill--active');
   document.querySelectorAll('.article-card').forEach(function(card) {
     if (tag === 'all') {
-      card.style.display = 'block';
+      card.style.display = '';
     } else {
       var tags = (card.getAttribute('data-tags') || '').split(',');
-      card.style.display = tags.indexOf(tag) !== -1 ? 'block' : 'none';
+      card.style.display = tags.indexOf(tag) !== -1 ? '' : 'none';
     }
   });
+  // Reset pagination after filter
+  paginateItems('.article-card[style=""],.article-card:not([style*="none"])', 5, 'articles-show-more');
 }

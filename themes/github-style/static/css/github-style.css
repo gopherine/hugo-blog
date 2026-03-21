@@ -349,3 +349,17 @@ body {
   color: #fff;
   border-color: #6f42c1;
 }
+
+/* Article summary — strip images and clean up */
+.article-summary img,
+.article-summary hr {
+  display: none;
+}
+
+.article-summary h1,
+.article-summary h2,
+.article-summary h3 {
+  font-size: inherit;
+  font-weight: normal;
+  display: inline;
+}
