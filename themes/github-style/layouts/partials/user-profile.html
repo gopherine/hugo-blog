@@ -178,7 +178,7 @@
     <div class="flex-shrink-0 mb-4 col-12 col-md-9 mb-md-0">
       {{ partial "mobile-menus.html" . }}
       {{ if .IsHome }}
-        {{ block "overview" . }}{{ end }}
+        {{ partial "homepage-content.html" . }}
       {{ else }}
         {{ block "posts" . }}{{ end }}
       {{ end }}
