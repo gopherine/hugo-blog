@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+@source "../../themes/github-style/layouts/**/*.html";
+@source "../../content/**/*.md";
+@source "../../static/js/*.js";

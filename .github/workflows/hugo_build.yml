@@ -3,22 +3,29 @@ name: Hugo Build
 on:
   push:
     branches:
-      - main  # Trigger the workflow on push events to the main branch
+      - main
   pull_request:
     branches:
-      - main  # Trigger the workflow on pull requests targeting the main branch
+      - main
+  issues:
+    types: [opened, edited, closed, labeled, unlabeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # The type of runner that the job will run on
+    runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4  # Checks out your repository under $GITHUB_WORKSPACE, so your workflow can access it
+    - uses: actions/checkout@v4
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'  # Use the Node.js version that matches your development environment
+        node-version: '24'
+        cache: 'npm'
 
     - name: Install Dependencies
       run: npm install
@@ -26,20 +33,21 @@ jobs:
     - name: Setup Hugo
       uses: peaceiris/actions-hugo@v2
       with:
-        hugo-version: 'latest'
+        hugo-version: '0.158.0'
         extended: true
 
     - name: Build
-      run: npm run build  # Runs the Hugo build command
+      run: npm run build
       env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NEXT_PUBLIC_TINA_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_TINA_CLIENT_ID }}
         TINA_TOKEN: ${{ secrets.TINA_TOKEN }}
 
     - name: Deploy to Vercel
       uses: amondnet/vercel-action@v20
       with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}  # Vercel token for authentication
-        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}  # Vercel Organization ID
-        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}  # Vercel Project ID
-        vercel-args: '--prod'  # Deploy to production
-        working-directory: ./public  # Directory to deploy
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--prod'
+        working-directory: ./public

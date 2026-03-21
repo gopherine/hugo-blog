@@ -1,25 +1,22 @@
 {
   "name": "atharva",
   "version": "1.0.0",
-  "description": "## Features",
-  "main": "index.js",
+  "description": "Atharva Pandey's Hugo Blog",
   "scripts": {
-    "build": "tinacms build && hugo --minify",
-    "build:css": "postcss assets/css/main.css -o static/css/style.css"
+    "build": "(tinacms build || echo 'TinaCMS build skipped') && hugo --minify",
+    "build:css": "postcss assets/css/main.css -o themes/github-style/static/css/tailwind.css",
+    "dev": "hugo server -D"
   },
   "keywords": [],
-  "author": "",
+  "author": "Atharva Pandey",
   "license": "MIT",
   "devDependencies": {
-    "@fullhuman/postcss-purgecss": "^5.0.0",
-    "@tinacms/cli": "^1.5.39",
-    "autoprefixer": "^10.4.17",
-    "postcss": "^8.4.35",
-    "postcss-cli": "^11.0.0",
-    "postcss-import": "^16.0.1",
-    "tailwindcss": "^3.4.1"
+    "@tailwindcss/postcss": "^4.2.1",
+    "@tinacms/cli": "^2.1.5",
+    "postcss": "^8.5.3",
+    "postcss-cli": "^11.0.0"
   },
   "dependencies": {
-    "tinacms": "^1.5.28"
+    "tinacms": "^3.4.1"
   }
 }

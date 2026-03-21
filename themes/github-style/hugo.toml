@@ -30,6 +30,13 @@ value = "Exploring the Depths of Software Engineering and Beyond"
 name = "Atharva Pandey"
 bio = "A software engineer passionate about building scalable systems, exploring new technologies, and sharing knowledge. When not coding, you'll find me sipping on a bold cup of coffee (decaf is not an option)."
 
+[params.microblog]
+enabled=true
+repo="gopherine/hugo-blog"
+label="microblog"
+author="Gopherine"
+maxPosts=10
+
 [params.giscus]
 repo="gopherine/hugo-blog"
 repoId="R_kgDOLTrS1w"

@@ -1,16 +1,49 @@
+[security]
+[security.funcs]
+getenv = ['^HUGO_', '^CI$', '^GITHUB_TOKEN$']
+
 baseURL='https://atharvapandey.com/'
 languageCode='en-us'
 title='Atharva Pandey'
-theme="github-style"
+# theme imported via module.imports below
 copyright="Copyright ©"
 
 [module]
+[[module.imports]]
+path = "github-style"
+[[module.imports.mounts]]
+source = "layouts"
+target = "layouts"
+[[module.imports.mounts]]
+source = "static"
+target = "static"
+[[module.imports.mounts]]
+source = "assets"
+target = "assets"
 [[module.mounts]]
-source="assets"
-target="assets"
+source = "content"
+target = "content"
 [[module.mounts]]
-source="hugo_stats.json"
-target="assets/watching/hugo_stats.json"
+source = "static"
+target = "static"
+[[module.mounts]]
+source = "layouts"
+target = "layouts"
+[[module.mounts]]
+source = "data"
+target = "data"
+[[module.mounts]]
+source = "assets"
+target = "assets"
+[[module.mounts]]
+source = "i18n"
+target = "i18n"
+[[module.mounts]]
+source = "archetypes"
+target = "archetypes"
+[[module.mounts]]
+source = "hugo_stats.json"
+target = "assets/watching/hugo_stats.json"
 
 [build]
 writeStats=true
@@ -18,7 +51,7 @@ writeStats=true
 source="assets/watching/hugo_stats\\.json"
 target="styles\\.css"
 [[build.cachebusters]]
-source="(postcss|tailwind)\\.config\\.js"
+source="postcss\\.config\\.js"
 target="css"
 [[build.cachebusters]]
 source="assets/.*\\.(js|ts|jsx|tsx)"
@@ -37,11 +70,11 @@ disableXML=false
 minifyOutput=true
 [minify.tdewolff]
 [minify.tdewolff.css]
-keepCSS2=true
+version=2
 precision=0
 [minify.tdewolff.html]
 keepComments=false
-keepConditionalComments=false
+keepSpecialComments=false
 keepDefaultAttrVals=true
 keepDocumentTags=true
 keepEndTags=true
@@ -60,6 +93,13 @@ precision=0
 [minify.tdewolff.xml]
 keepWhitespace=false
 
+
+[params.microblog]
+enabled = true
+repo = "gopherine/hugo-blog"
+label = "microblog"
+author = "Gopherine"
+maxPosts = 10
 
 [[deployment.matchers]]
 # Cache static assets for 1 year.
