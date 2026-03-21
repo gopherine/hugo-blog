@@ -104,7 +104,6 @@
         </div>
 
         <div class="clearfix pt-3 mt-3 border-top color-border-secondary hide-sm hide-md">
-          <h2 class="mb-2 h4">Organizations</h2>
           <div style="display:flex;justify-content:flex-start;flex-wrap:wrap;margin-bottom:3px;">
           {{ if .Site.Params.github}}
           <a style="margin: 0 10px 10px 0;" href="https://github.com/{{ .Site.Params.github }}">
@@ -171,6 +170,39 @@
           </a>
           {{ end }}
          </div>
+        </div>
+        <div class="pt-3 mt-3 border-top color-border-secondary hide-sm hide-md">
+          <a href="/resume.pdf" class="link-gray-dark text-small">
+            <svg class="octicon mr-1" viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+              <path d="M3.75 1.5a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V6H9.75A1.75 1.75 0 0 1 8 4.25V1.5Zm5.75 0v2.75c0 .138.112.25.25.25h2.75L9.5 1.5ZM2 1.75C2 .784 2.784 0 3.75 0h5.086c.464 0 .909.184 1.237.513l3.414 3.414c.329.328.513.773.513 1.237v8.086A1.75 1.75 0 0 1 12.25 15h-8.5A1.75 1.75 0 0 1 2 13.25Z"/>
+            </svg>
+            Resume
+          </a>
+        </div>
+        <div class="pt-3 mt-3 border-top color-border-secondary hide-sm hide-md">
+          <div class="text-small text-bold mb-2">Activity</div>
+          <div class="activity-streak">
+            {{ $now := now }}
+            {{ $pages := where .Site.RegularPages "Section" "in" (slice "post") }}
+            {{ $totalThisYear := 0 }}
+            {{ range $pages }}
+              {{ if eq (.PublishDate.Format "2006") ($now.Format "2006") }}
+                {{ $totalThisYear = add $totalThisYear 1 }}
+              {{ end }}
+            {{ end }}
+            {{ range $week := slice 11 10 9 8 7 6 5 4 3 2 1 0 }}
+              {{ $count := 0 }}
+              {{ range $pages }}
+                {{ $daysDiff := div (sub $now.Unix .PublishDate.Unix) 86400 }}
+                {{ if and (ge $daysDiff (mul $week 7)) (lt $daysDiff (mul (add $week 1) 7)) }}
+                  {{ $count = add $count 1 }}
+                {{ end }}
+              {{ end }}
+              {{ $level := cond (eq $count 0) "0" (cond (le $count 1) "1" (cond (le $count 2) "2" "3")) }}
+              <div class="streak-cell streak-level-{{ $level }}"></div>
+            {{ end }}
+          </div>
+          <div class="text-small text-gray mt-1">{{ $totalThisYear }} posts this year</div>
         </div>
       </div>
     </div>

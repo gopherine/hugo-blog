@@ -214,3 +214,32 @@ body {
   border-radius: 2em;
   white-space: nowrap;
 }
+
+/* Activity streak mini heatmap */
+.activity-streak {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2px;
+}
+
+.streak-cell {
+  aspect-ratio: 1;
+  border-radius: 2px;
+}
+
+.streak-level-0 { background-color: var(--color-calendar-graph-day-bg, #ebedf0); }
+.streak-level-1 { background-color: var(--color-calendar-graph-day-L1-bg, #9be9a8); }
+.streak-level-2 { background-color: var(--color-calendar-graph-day-L2-bg, #40c463); }
+.streak-level-3 { background-color: var(--color-calendar-graph-day-L3-bg, #30a14e); }
+
+/* Mobile compact sidebar */
+@media (max-width: 768px) {
+  .h-card .p-note.user-profile-bio {
+    font-size: 12px;
+  }
+
+  .h-card .activity-streak,
+  .h-card .vcard-details {
+    display: none;
+  }
+}
