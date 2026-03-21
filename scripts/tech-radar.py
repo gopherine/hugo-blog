@@ -217,8 +217,30 @@ def main():
 
     print(f"Generated: {title} ({len(body)} chars)")
 
-    # Create draft discussion
+    # Dedup: check if a discussion with similar title already exists
     repo_id = os.environ.get("REPO_ID", "R_kgDOLTrS1w")
+    cat_id_check = os.environ.get("THOUGHTS_CAT_ID", "DIC_kwDOLTrS184C468G")
+    dedup_query = json.dumps({"query": f'{{ repository(owner: "gopherine", name: "hugo-blog") {{ discussions(categoryId: "{cat_id_check}", first: 20, orderBy: {{field: CREATED_AT, direction: DESC}}) {{ nodes {{ title }} }} }} }}'})
+    dedup_result = subprocess.run(
+        ["curl", "-s", "-X", "POST", "https://api.github.com/graphql",
+         "-H", f"Authorization: Bearer {os.environ['GH_TOKEN']}",
+         "-H", "Content-Type: application/json",
+         "-d", dedup_query],
+        capture_output=True, text=True)
+    try:
+        existing = json.loads(dedup_result.stdout)
+        existing_titles = [d["title"].lower() for d in existing.get("data", {}).get("repository", {}).get("discussions", {}).get("nodes", [])]
+        # Check for keyword overlap (more than 3 shared words)
+        title_words = set(title.lower().split())
+        for et in existing_titles:
+            overlap = title_words & set(et.split())
+            if len(overlap) >= 3:
+                print(f"Skipping — similar discussion exists: '{et}' (overlap: {overlap})")
+                return
+    except Exception as e:
+        print(f"Dedup check failed: {e}, proceeding anyway")
+
+    # Create draft discussion
     cat_id = os.environ.get("THOUGHTS_CAT_ID", "DIC_kwDOLTrS184C468G")
 
     draft_body = (
@@ -265,13 +287,18 @@ def main():
 
         if label_id:
             add_label = json.dumps({"query": f'mutation {{ addLabelsToLabelable(input: {{labelableId: "{disc_id}", labelIds: ["{label_id}"]}}) {{ clientMutationId }} }}'})
-            subprocess.run(
+            label_resp = subprocess.run(
                 ["curl", "-s", "-X", "POST", "https://api.github.com/graphql",
                  "-H", f"Authorization: Bearer {os.environ['GH_TOKEN']}",
                  "-H", "Content-Type: application/json",
                  "-d", add_label],
                 capture_output=True, text=True)
-            print(f"Draft label added. Remove label to publish.")
+            if "errors" in label_resp.stdout:
+                print(f"WARNING: Failed to add draft label: {label_resp.stdout[:200]}")
+            else:
+                print(f"Draft label added. Remove label to publish.")
+        else:
+            print("WARNING: Could not find 'draft' label. Discussion created WITHOUT draft label!")
 
 
 if __name__ == "__main__":
