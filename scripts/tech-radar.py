@@ -34,14 +34,23 @@ def groq(prompt, max_tokens=800):
 
 
 def fetch_github_trending():
+    """Fetch recently created repos — use a 7-day window instead of month-start
+    to avoid the same repos sitting at the top for weeks."""
     items = []
+    from datetime import timedelta
+    # Look back 7 days so results rotate daily
+    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     for lang in ["go", "rust", "typescript"]:
         try:
-            date_prefix = datetime.now().strftime("%Y-%m-") + "01"
             data = fetch_url(
-                f"https://api.github.com/search/repositories?q=created:>{date_prefix}+language:{lang}&sort=stars&order=desc&per_page=3"
+                f"https://api.github.com/search/repositories?q=created:>{week_ago}+language:{lang}&sort=stars&order=desc&per_page=5"
             )
-            for r in json.loads(data).get("items", [])[:2]:
+            repos = json.loads(data).get("items", [])
+            # Skip top 1-2 (likely already covered), take next 2-3 for freshness
+            import random
+            sample = repos[1:5] if len(repos) > 4 else repos[:3]
+            random.shuffle(sample)
+            for r in sample[:2]:
                 readme = ""
                 try:
                     rd = json.loads(fetch_url(f"https://api.github.com/repos/{r['full_name']}/readme"))
@@ -81,22 +90,33 @@ def fetch_lobsters():
 
 
 def fetch_hn():
+    """Fetch from both top and best stories for more variety."""
     items = []
-    try:
-        with urllib.request.urlopen("https://hacker-news.firebaseio.com/v0/topstories.json") as r:
-            top_ids = json.loads(r.read())[:15]
-        for sid in top_ids:
-            try:
-                with urllib.request.urlopen(f"https://hacker-news.firebaseio.com/v0/item/{sid}.json") as r:
-                    s = json.loads(r.read())
-                    if s.get("score", 0) > 100 and s.get("url"):
-                        items.append(f"[HN/{s['score']}pts] {s['title']}\nURL: {s['url']}")
-                        if len(items) >= 5:
-                            break
-            except Exception:
-                continue
-    except Exception as e:
-        print(f"  HN: {e}")
+    import random
+    # Mix top + best stories for variety — top changes slowly, best rotates more
+    endpoints = ["topstories", "beststories"]
+    seen_ids = set()
+    for endpoint in endpoints:
+        try:
+            with urllib.request.urlopen(f"https://hacker-news.firebaseio.com/v0/{endpoint}.json") as r:
+                story_ids = json.loads(r.read())[:30]
+            # Shuffle to avoid always picking the same top ones
+            random.shuffle(story_ids)
+            for sid in story_ids:
+                if sid in seen_ids:
+                    continue
+                seen_ids.add(sid)
+                try:
+                    with urllib.request.urlopen(f"https://hacker-news.firebaseio.com/v0/item/{sid}.json") as r:
+                        s = json.loads(r.read())
+                        if s.get("score", 0) > 80 and s.get("url"):
+                            items.append(f"[HN/{s['score']}pts] {s['title']}\nURL: {s['url']}")
+                            if len(items) >= 8:
+                                return items
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"  HN {endpoint}: {e}")
     return items
 
 
@@ -123,7 +143,7 @@ Raw material from GitHub Trending, Lobste.rs, Hacker News, and arXiv:
 
 {context}
 
-Pick the ONE most interesting item. Read its README/abstract carefully. Write a LinkedIn post (200-350 words) as if you just discovered this and are telling your engineer friends about it.
+Review ALL items across all sources. Pick the ONE most interesting item you haven't seen before — prioritize novelty over star count. Prefer items from different sources each time. Read its README/abstract carefully. Write a LinkedIn post (200-350 words) as if you just discovered this and are telling your engineer friends about it.
 
 VOICE EXAMPLES (study how these sound human, not AI):
 
@@ -176,51 +196,18 @@ def main():
 
     print(f"Sources: {len(gh)} GitHub, {len(lb)} Lobsters, {len(hn)} HN, {len(ax)} arXiv")
 
+    import random
     all_items = gh + lb + hn + ax
+    random.shuffle(all_items)  # Shuffle so the LLM doesn't always fixate on first items
     if len(all_items) < 2:
         print("Not enough content. Skipping.")
         return
 
-    context = "\n\n---\n\n".join(all_items[:12])
-    prompt = PROMPT_TEMPLATE.format(context=context)
-
-    print("Generating with Groq...")
-    content = groq(prompt)
-
-    start = content.find("{")
-    end = content.rfind("}") + 1
-    raw_json = content[start:end]
-    # Fix unescaped newlines inside JSON string values
-    raw_json = raw_json.replace("\n", "\\n").replace("\t", "\\t")
-    # But don't double-escape already escaped ones
-    raw_json = raw_json.replace("\\\\n", "\\n")
-    try:
-        post = json.loads(raw_json)
-    except json.JSONDecodeError:
-        # Fallback: extract title and body manually
-        title_match = re.search(r'"title"\s*:\s*"(.*?)"', raw_json)
-        body_start = raw_json.find('"body"')
-        if title_match and body_start != -1:
-            title_val = title_match.group(1)
-            body_val = raw_json[body_start:].split(':', 1)[1].strip().strip('"').rstrip('}"').strip('"')
-            post = {"title": title_val, "body": body_val.replace("\\n", "\n")}
-        else:
-            print(f"Failed to parse response: {raw_json[:200]}")
-            return
-
-    title = post.get("title", "")
-    body = post.get("body", "")
-
-    if len(body) < 100:
-        print("Content too short. Skipping.")
-        return
-
-    print(f"Generated: {title} ({len(body)} chars)")
-
-    # Dedup: check if a discussion with similar title already exists
+    # Fetch existing discussions once for dedup
     repo_id = os.environ.get("REPO_ID", "R_kgDOLTrS1w")
-    cat_id_check = os.environ.get("THOUGHTS_CAT_ID", "DIC_kwDOLTrS184C468G")
-    dedup_query = json.dumps({"query": f'{{ repository(owner: "gopherine", name: "hugo-blog") {{ discussions(categoryId: "{cat_id_check}", first: 20, orderBy: {{field: CREATED_AT, direction: DESC}}) {{ nodes {{ title }} }} }} }}'})
+    cat_id = os.environ.get("THOUGHTS_CAT_ID", "DIC_kwDOLTrS184C468G")
+    existing_titles = []
+    dedup_query = json.dumps({"query": f'{{ repository(owner: "gopherine", name: "hugo-blog") {{ discussions(categoryId: "{cat_id}", first: 30, orderBy: {{field: CREATED_AT, direction: DESC}}) {{ nodes {{ title }} }} }} }}'})
     dedup_result = subprocess.run(
         ["curl", "-s", "-X", "POST", "https://api.github.com/graphql",
          "-H", f"Authorization: Bearer {os.environ['GH_TOKEN']}",
@@ -230,19 +217,91 @@ def main():
     try:
         existing = json.loads(dedup_result.stdout)
         existing_titles = [d["title"].lower() for d in existing.get("data", {}).get("repository", {}).get("discussions", {}).get("nodes", [])]
-        # Check for keyword overlap (more than 3 shared words)
-        title_words = set(title.lower().split())
-        for et in existing_titles:
-            overlap = title_words & set(et.split())
-            if len(overlap) >= 3:
-                print(f"Skipping — similar discussion exists: '{et}' (overlap: {overlap})")
-                return
+        print(f"Dedup: {len(existing_titles)} existing discussions loaded")
     except Exception as e:
-        print(f"Dedup check failed: {e}, proceeding anyway")
+        print(f"Dedup check failed: {e}, proceeding without dedup")
+
+    # Stop words to ignore in dedup overlap check
+    STOP_WORDS = {
+        "a", "an", "the", "is", "it", "in", "on", "of", "to", "for", "and",
+        "or", "but", "with", "this", "that", "are", "was", "be", "has", "had",
+        "not", "no", "do", "does", "can", "could", "will", "would", "should",
+        "from", "by", "at", "as", "if", "so", "just", "how", "what", "why",
+        "when", "where", "who", "which", "your", "you", "my", "i", "we",
+        "-", "--", "—", "vs", "about", "into", "its", "i'm", "here's",
+    }
+
+    def is_duplicate(title):
+        """Check if title overlaps significantly with existing discussions."""
+        title_words = set(title.lower().split()) - STOP_WORDS
+        # Remove very short words (1-2 chars)
+        title_words = {w for w in title_words if len(w) > 2}
+        for et in existing_titles:
+            et_words = set(et.split()) - STOP_WORDS
+            et_words = {w for w in et_words if len(w) > 2}
+            overlap = title_words & et_words
+            # Require 4+ meaningful word overlap to consider it a duplicate
+            if len(overlap) >= 4:
+                print(f"  Dedup match: '{et}' (overlap: {overlap})")
+                return True
+        return False
+
+    # Try up to 3 times with different source slices to get a non-duplicate draft
+    max_attempts = 3
+    posted = False
+    for attempt in range(max_attempts):
+        # Rotate which items go first so the LLM picks different topics
+        offset = attempt * 4
+        rotated = all_items[offset:] + all_items[:offset]
+        context = "\n\n---\n\n".join(rotated[:12])
+        prompt = PROMPT_TEMPLATE.format(context=context)
+
+        print(f"Generating with Groq (attempt {attempt + 1}/{max_attempts})...")
+        content = groq(prompt)
+
+        start = content.find("{")
+        end = content.rfind("}") + 1
+        raw_json = content[start:end]
+        # Fix unescaped newlines inside JSON string values
+        raw_json = raw_json.replace("\n", "\\n").replace("\t", "\\t")
+        # But don't double-escape already escaped ones
+        raw_json = raw_json.replace("\\\\n", "\\n")
+        try:
+            post = json.loads(raw_json)
+        except json.JSONDecodeError:
+            # Fallback: extract title and body manually
+            title_match = re.search(r'"title"\s*:\s*"(.*?)"', raw_json)
+            body_start = raw_json.find('"body"')
+            if title_match and body_start != -1:
+                title_val = title_match.group(1)
+                body_val = raw_json[body_start:].split(':', 1)[1].strip().strip('"').rstrip('}"').strip('"')
+                post = {"title": title_val, "body": body_val.replace("\\n", "\n")}
+            else:
+                print(f"  Failed to parse response: {raw_json[:200]}")
+                continue
+
+        title = post.get("title", "")
+        body = post.get("body", "")
+
+        if len(body) < 100:
+            print(f"  Content too short ({len(body)} chars). Retrying...")
+            continue
+
+        print(f"  Generated: {title} ({len(body)} chars)")
+
+        if is_duplicate(title):
+            print(f"  Duplicate detected, retrying with different sources...")
+            continue
+
+        # Success — we have a non-duplicate draft
+        posted = True
+        break
+
+    if not posted:
+        print("All attempts produced duplicates or failures. Skipping this run.")
+        return
 
     # Create draft discussion
-    cat_id = os.environ.get("THOUGHTS_CAT_ID", "DIC_kwDOLTrS184C468G")
-
     draft_body = (
         f"*Auto-generated draft. Remove the `draft` label to publish to site + LinkedIn.*"
         f"\n\n---\n\n{body}"
