@@ -302,10 +302,9 @@ def main():
         return
 
     # Create draft discussion
-    draft_body = (
-        f"*Auto-generated draft. Remove the `draft` label to publish to site + LinkedIn.*"
-        f"\n\n---\n\n{body}"
-    )
+    # No preamble — the "draft" label is the only gate.
+    # Content goes directly to site + LinkedIn when label is removed.
+    draft_body = body
 
     # Create discussion
     mutation = json.dumps({
