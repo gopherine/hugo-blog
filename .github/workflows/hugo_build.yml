@@ -87,9 +87,9 @@ jobs:
           echo "should_post=false" >> "$GITHUB_OUTPUT"
           exit 0
         fi
-        # Only post for human author
-        if [[ "$AUTHOR" != "Gopherine" && "$AUTHOR" != "gopherine" ]]; then
-          echo "Skipping bot-authored post by $AUTHOR"
+        # Only post for known authors (includes github-actions[bot] for tech-radar drafts)
+        if [[ "$AUTHOR" != "Gopherine" && "$AUTHOR" != "gopherine" && "$AUTHOR" != "github-actions[bot]" ]]; then
+          echo "Skipping unknown author: $AUTHOR"
           echo "should_post=false" >> "$GITHUB_OUTPUT"
           exit 0
         fi
