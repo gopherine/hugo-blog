@@ -7,10 +7,6 @@ on:
   pull_request:
     branches:
       - main
-  issues:
-    types: [opened, edited, closed, labeled, unlabeled]
-  discussion:
-    types: [created, edited, labeled, unlabeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,8 +35,6 @@ jobs:
 
     - name: Build
       run: bun run build
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Deploy to Vercel
       uses: amondnet/vercel-action@v20
@@ -51,109 +45,3 @@ jobs:
         vercel-args: '--prod --archive=tgz'
         working-directory: ./public
 
-  syndicate-linkedin:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'discussion' && (github.event.action == 'created' || github.event.action == 'unlabeled')
-    steps:
-    - name: Check if should post to LinkedIn
-      id: check
-      env:
-        CATEGORY: ${{ github.event.discussion.category.name }}
-        AUTHOR: ${{ github.event.discussion.user.login }}
-        LABELS: ${{ toJSON(github.event.discussion.labels) }}
-        ACTION: ${{ github.event.action }}
-        REMOVED_LABEL: ${{ github.event.label.name }}
-      run: |
-        # On unlabeled: only proceed if the removed label was "draft"
-        if [[ "$ACTION" == "unlabeled" && "$REMOVED_LABEL" != "draft" ]]; then
-          echo "Unrelated label removed, skipping"
-          echo "should_post=false" >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
-        # Check if discussion still has draft label
-        if echo "$LABELS" | python3 -c "import json,sys; labels=[l.get('name','') for l in json.load(sys.stdin) or []]; exit(0 if 'draft' not in labels else 1)" 2>/dev/null; then
-          : # No draft label, proceed
-        else
-          echo "Still has draft label, skipping"
-          echo "should_post=false" >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
-        # Only post for correct categories
-        if [[ "$CATEGORY" != "Thoughts" && "$CATEGORY" != "Shipped" ]]; then
-          echo "Wrong category: $CATEGORY"
-          echo "should_post=false" >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
-        # Only post for known authors (includes github-actions[bot] for tech-radar drafts)
-        if [[ "$AUTHOR" != "Gopherine" && "$AUTHOR" != "gopherine" && "$AUTHOR" != "github-actions[bot]" ]]; then
-          echo "Skipping unknown author: $AUTHOR"
-          echo "should_post=false" >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
-        echo "should_post=true" >> "$GITHUB_OUTPUT"
-
-    - name: Format and post to LinkedIn
-      if: steps.check.outputs.should_post == 'true'
-      env:
-        LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
-        LINKEDIN_PERSON_ID: ${{ secrets.LINKEDIN_PERSON_ID }}
-        TITLE: ${{ github.event.discussion.title }}
-        BODY: ${{ github.event.discussion.body }}
-      run: |
-        python3 << 'PYEOF'
-        import json, os, subprocess, re
-
-        title = os.environ["TITLE"]
-        body = os.environ["BODY"]
-
-        # Strip markdown for LinkedIn plain text:
-        # Remove **bold** → BOLD (uppercase for LinkedIn emphasis)
-        text = re.sub(r'\*\*([^*]+)\*\*', lambda m: m.group(1).upper(), body)
-        # Remove markdown links [text](url) → text (url)
-        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 (\2)', text)
-        # Remove images ![alt](url)
-        text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
-        # Remove horizontal rules
-        text = re.sub(r'^---+$', '', text, flags=re.MULTILINE)
-        # Remove HTML tags
-        text = re.sub(r'<[^>]+>', '', text)
-        # Remove auto-generated notice lines
-        text = re.sub(r'\*Auto-generated.*?\*', '', text)
-        # Clean up extra blank lines
-        text = re.sub(r'\n{3,}', '\n\n', text).strip()
-
-        # Don't repeat title if body already starts with it
-        if text.lower().startswith(title.lower()):
-            post_text = text
-        else:
-            post_text = f"{title}\n\n{text}"
-
-        # Truncate for LinkedIn (3000 char limit) and add CTA
-        if len(post_text) > 2800:
-            post_text = post_text[:2800] + "..."
-
-        post_text += "\n\n→ https://atharvapandey.com"
-
-        # Post to LinkedIn
-        encoded = json.dumps(post_text)
-        payload = json.dumps({
-            "author": f"urn:li:person:{os.environ['LINKEDIN_PERSON_ID']}",
-            "lifecycleState": "PUBLISHED",
-            "specificContent": {
-                "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary": {"text": post_text},
-                    "shareMediaCategory": "NONE"
-                }
-            },
-            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
-        })
-
-        result = subprocess.run(
-            ["curl", "-s", "-X", "POST", "https://api.linkedin.com/v2/ugcPosts",
-             "-H", f"Authorization: Bearer {os.environ['LINKEDIN_ACCESS_TOKEN']}",
-             "-H", "Content-Type: application/json",
-             "-d", payload],
-            capture_output=True, text=True)
-
-        print(f"LinkedIn response: {result.stdout[:200]}")
-        PYEOF

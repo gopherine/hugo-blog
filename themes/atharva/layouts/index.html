@@ -1,0 +1,66 @@
+{{ define "main" }}
+{{ $posts := where .Site.RegularPages "Section" "post" }}
+{{ $series := slice }}
+{{ range $posts }}{{ with .Params.series }}{{ $series = $series | append . }}{{ end }}{{ end }}
+{{ $series = uniq $series }}
+
+<section class="hero wrap">
+  <p class="hero-eyebrow">Polyglot Engineer · Technical Leader</p>
+  <h1 class="hero-name">I'm <mark>Atharva Pandey</mark>.</h1>
+  <p class="hero-title">Writing about Go, Rust, and the systems in between.</p>
+  <p class="hero-lede">{{ .Site.Params.description }}</p>
+  {{ partial "social-links.html" (dict "ctx" .) }}
+  <div class="hero-stat">
+    <div><b>{{ len $posts }}</b><span>articles</span></div>
+    <div><b>{{ len $series }}</b><span>courses & series</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <section class="section">
+    <div class="section-head">
+      <h2 class="section-title">Recent writing</h2>
+      <a class="section-link" href="{{ "/writing/" | relURL }}">All writing →</a>
+    </div>
+    <ul class="post-list">
+      {{ range first 8 ((where .Site.RegularPages "Section" "post").ByPublishDate.Reverse) }}
+        {{ partial "post-row.html" (dict "p" . "summary" true) }}
+      {{ end }}
+    </ul>
+  </section>
+
+  {{ with .Site.GetPage "section" "post" }}
+  <section class="section">
+    <div class="section-head">
+      <h2 class="section-title">Courses</h2>
+      <a class="section-link" href="{{ "/series/" | relURL }}">Browse all →</a>
+    </div>
+    <div class="course-grid">
+      {{ range (first 6 ((where $.Site.RegularPages "Section" "post").ByPublishDate.Reverse)) }}
+        {{ with .GetTerms "series" }}{{ range . }}
+        <a class="course-card" href="{{ .RelPermalink }}">
+          <span class="course-card-name">{{ .LinkTitle }}</span>
+        </a>
+        {{ end }}{{ end }}
+      {{ end }}
+    </div>
+  </section>
+  {{ end }}
+
+  {{ with .Site.GetPage "section" "notes" }}
+    {{ with .Pages }}
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">Notes</h2>
+        <a class="section-link" href="{{ "/notes/" | relURL }}">All notes →</a>
+      </div>
+      <ul class="post-list">
+        {{ range first 3 .ByDate.Reverse }}
+          {{ partial "post-row.html" (dict "p" . "summary" false) }}
+        {{ end }}
+      </ul>
+    </section>
+    {{ end }}
+  {{ end }}
+</div>
+{{ end }}

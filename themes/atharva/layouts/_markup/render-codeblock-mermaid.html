@@ -1,0 +1,8 @@
+{{- /*
+  Mermaid render hook — inlines the diagram source and marks it for
+  client-side rendering by mermaid.js (loaded only when a diagram exists).
+*/ -}}
+{{- $raw := .Inner | htmlEscape -}}
+<figure class="diagram">
+  <div class="diagram-body mermaid">{{ $raw | safeHTML }}</div>
+</figure>

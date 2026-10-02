@@ -1,0 +1,21 @@
+{{ define "main" }}
+{{ $lessons := sort .Pages ".Params.lesson" "asc" }}
+<div class="wrap">
+  <header class="page-head">
+    <p class="hero-eyebrow">Course</p>
+    <h1 class="page-title">{{ .Title }}</h1>
+    <p class="page-lede">{{ len $lessons }} lessons{{ with (index $lessons 0).CurrentSection }} · {{ .Title }}{{ end }}. Start at lesson one and work through in order.</p>
+  </header>
+
+  <section class="section">
+    <ul class="series-list series-list--page">
+      {{ range $lessons }}
+      <li class="series-item">
+        {{ with .Params.lesson }}<span class="series-num">{{ . }}.</span>{{ end }}
+        <a href="{{ .RelPermalink }}">{{ .Title | replaceRE "^Lesson \\d+: " "" | replaceRE " — .*$" "" }}</a>
+      </li>
+      {{ end }}
+    </ul>
+  </section>
+</div>
+{{ end }}

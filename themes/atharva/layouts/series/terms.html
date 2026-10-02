@@ -1,0 +1,58 @@
+{{ define "main" }}
+{{ $sections := slice
+    (dict "id" "go" "path" "post/go" "label" "Go" "lede" "From first program to production services, concurrency, and internals.")
+    (dict "id" "rust" "path" "post/rust" "label" "Rust" "lede" "Ownership, async, macros, and systems work — from scratch to advanced.")
+    (dict "id" "fundamentals" "path" "post/fundamentals" "label" "Fundamentals" "lede" "Language-agnostic engineering: algorithms, databases, distributed systems, and design.") }}
+
+<div class="wrap">
+  <header class="page-head">
+    <p class="hero-eyebrow">Courses &amp; series</p>
+    <h1 class="page-title">Browse by course</h1>
+    <p class="page-lede">{{ len .Data.Terms }} guided, ordered courses and series. Find one fast — type a few letters.</p>
+    <label class="search-field">
+      <span class="search-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3"></path></svg></span>
+      <input id="course-search" type="search" class="search-input" placeholder="Search {{ len .Data.Terms }} courses…  (press /)" aria-label="Search courses" autocomplete="off">
+    </label>
+    <p id="course-search-status" class="text-faint" role="status" aria-live="polite"></p>
+    <nav class="jump-nav" id="courses-jump" aria-label="Jump to a section">
+      {{ range $sections }}<a href="#{{ .id }}">{{ .label }}</a>{{ end }}
+    </nav>
+  </header>
+
+  {{ range $sections }}
+    {{ $s := . }}
+    {{ with $.Site.GetPage "section" $s.path }}
+      {{ $pages := .Pages }}
+      {{ $names := slice }}
+      {{ range $pages }}{{ with .Params.series }}{{ $names = $names | append . }}{{ end }}{{ end }}
+      {{ $names = uniq $names }}
+      {{ $names = sort $names }}
+      {{ with $names }}
+      <section class="section course-section" id="{{ $s.id }}">
+        <div class="course-section-head">
+          <div>
+            <h2 class="course-section-title">{{ $s.label }}</h2>
+            <p class="course-section-lede">{{ $s.lede }}</p>
+          </div>
+          <span class="course-section-count">{{ len . }} courses</span>
+        </div>
+        <div class="course-grid">
+          {{ range . }}
+            {{ $name := . }}
+            {{ $items := where $pages ".Params.series" $name }}
+            {{ with (index $items 0).GetTerms "series" }}
+              {{ range . }}
+              <a class="course-card" href="{{ .RelPermalink }}">
+                <span class="course-card-name">{{ $name }}</span>
+                <span class="course-card-count">{{ len $items }} lesson{{ if ne (len $items) 1 }}s{{ end }}</span>
+              </a>
+              {{ end }}
+            {{ end }}
+          {{ end }}
+        </div>
+      </section>
+      {{ end }}
+    {{ end }}
+  {{ end }}
+</div>
+{{ end }}

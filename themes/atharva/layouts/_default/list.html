@@ -1,0 +1,25 @@
+{{ define "main" }}
+<div class="wrap">
+  <header class="page-head">
+    <h1 class="page-title">{{ with .Title }}{{ . }}{{ else }}{{ .Section | title }}{{ end }}</h1>
+    {{ with .Content }}<div class="page-lede">{{ . }}</div>{{ end }}
+  </header>
+
+  {{ if .Sections }}
+  <ul class="post-list">
+    {{ range .Sections }}
+    <li class="post-row">
+      <span class="post-date"></span>
+      <div><a href="{{ .RelPermalink }}"><h3 class="post-title">{{ .Title }}</h3></a></div>
+    </li>
+    {{ end }}
+  </ul>
+  {{ end }}
+
+  <ul class="post-list">
+    {{ range .Pages.ByPublishDate.Reverse }}
+      {{ partial "post-row.html" (dict "p" . "summary" true) }}
+    {{ end }}
+  </ul>
+</div>
+{{ end }}

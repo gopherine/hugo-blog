@@ -1,0 +1,16 @@
+{{ with .Params.series }}
+  {{ $series := . }}
+  {{ $items := where (where site.RegularPages "Section" "post") ".Params.series" $series }}
+  {{ $items = sort $items ".Params.lesson" "asc" }}
+  {{ $idx := -1 }}
+  {{ range $i, $p := $items }}{{ if eq $p.RelPermalink $.RelPermalink }}{{ $idx = $i }}{{ end }}{{ end }}
+  {{ $prev := "" }}{{ $next := "" }}
+  {{ if gt $idx 0 }}{{ $prev = index $items (sub $idx 1) }}{{ end }}
+  {{ if and (ge $idx 0) (lt $idx (sub (len $items) 1)) }}{{ $next = index $items (add $idx 1) }}{{ end }}
+  {{ if or $prev $next }}
+  <nav class="series-nav" aria-label="Within series">
+    {{ with $prev }}<a class="prev" href="{{ .RelPermalink }}"><span class="dir" aria-hidden="true">Previous</span><span>{{ .Title | replaceRE "^Lesson \\d+: " "" | replaceRE " — .*$" "" }}</span></a>{{ end }}
+    {{ with $next }}<a class="next" href="{{ .RelPermalink }}"><span class="dir" aria-hidden="true">Next</span><span>{{ .Title | replaceRE "^Lesson \\d+: " "" | replaceRE " — .*$" "" }}</span></a>{{ end }}
+  </nav>
+  {{ end }}
+{{ end }}

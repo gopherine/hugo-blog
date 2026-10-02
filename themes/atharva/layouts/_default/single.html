@@ -1,0 +1,27 @@
+{{ define "main" }}
+<article class="article wrap">
+  <header class="article-header">
+    <div class="article-kicker">
+      {{ with .CurrentSection }}<a href="{{ .RelPermalink }}">All {{ .Title }} articles</a><span>·</span>{{ end }}
+      {{ with .GetTerms "series" }}{{ range . }}<a href="{{ .RelPermalink }}">{{ .LinkTitle }} course</a><span>·</span>{{ end }}{{ end }}
+      {{ with .Params.lesson }}<span>Lesson {{ . }}</span><span>·</span>{{ end }}
+      <time datetime="{{ .PublishDate.Format "2006-01-02" }}">{{ .PublishDate.Format "January 2, 2006" }}</time>
+    </div>
+    <h1 class="article-title">{{ .Title }}</h1>
+    <div class="article-meta">
+      <span>{{ .ReadingTime }} min read</span>
+      {{ with .Params.author }}<span>{{ . }}</span>{{ end }}
+      {{ with .Params.tags }}<span>{{ delimit . " · " }}</span>{{ end }}
+    </div>
+  </header>
+
+  <div class="prose">{{ .Content }}</div>
+
+  {{ partial "series-nav.html" . }}
+
+  <div class="article-foot">
+    <a href="{{ "/writing/" | relURL }}">← All writing</a>
+    <a href="{{ "/notes/" | relURL }}">Notes →</a>
+  </div>
+</article>
+{{ end }}

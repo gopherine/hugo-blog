@@ -1,0 +1,26 @@
+{{- /*
+  Inline a committed diagram file (Excalidraw-exported .svg, draw.io, or any
+  vector/raster image) directly into the article. Renders as an inline SVG so
+  it can inherit the page's text color where the SVG uses currentColor.
+  No network access: the asset must live in the repo (assets/ or static/).
+
+  Usage:  {{< diagram src="diagrams/microservices.svg" caption="..." >}}
+          {{< diagram src="diagrams/flow.png" alt="Retry flow" >}}
+*/ -}}
+{{- $src := .Get "src" -}}
+{{- $caption := .Get "caption" -}}
+{{- $alt := .Get "alt" | default $caption | default "Diagram" -}}
+{{- $res := resources.Get $src -}}
+
+<figure class="diagram">
+  {{- if and $res (eq $res.MediaType.SubType "svg") -}}
+    <div class="diagram-body diagram-body--svg" role="img" aria-label="{{ $alt }}">
+      {{ $res.Content | safeHTML }}
+    </div>
+  {{- else if $res -}}
+    <img class="diagram-img" src="{{ $res.RelPermalink }}" alt="{{ $alt }}" loading="lazy">
+  {{- else -}}
+    <img class="diagram-img" src="{{ $src | relURL }}" alt="{{ $alt }}" loading="lazy">
+  {{- end -}}
+  {{- with $caption }}<figcaption class="diagram-caption">{{ . | markdownify }}</figcaption>{{ end -}}
+</figure>

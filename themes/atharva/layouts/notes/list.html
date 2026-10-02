@@ -1,0 +1,20 @@
+{{ define "main" }}
+<div class="wrap">
+  <header class="page-head">
+    <h1 class="page-title">{{ .Title }}</h1>
+    <p class="page-lede">Short pieces — working notes, half-formed ideas, and things worth writing down before they're a full article.</p>
+  </header>
+
+  {{ if .Pages }}
+  <section class="section">
+    <ul class="post-list">
+      {{ range .Pages.ByDate.Reverse }}
+        {{ partial "post-row.html" (dict "p" . "summary" true) }}
+      {{ end }}
+    </ul>
+  </section>
+  {{ else }}
+  <div class="empty">No notes yet.</div>
+  {{ end }}
+</div>
+{{ end }}

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="{{ .Site.LanguageCode }}">
+{{ partial "head.html" . }}
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  {{ partial "header.html" . }}
+  <main id="main" class="site-main">
+    {{ block "main" . }}{{ end }}
+  </main>
+  {{ partial "footer.html" . }}
+  <script src='{{ "js/atharva.js" | relURL }}' defer></script>
+  {{ if strings.Contains .Content "class=\"diagram-body mermaid\"" }}
+  <script src='{{ "vendor/mermaid.min.js" | relURL }}' defer></script>
+  {{ end }}
+</body>
+
+</html>

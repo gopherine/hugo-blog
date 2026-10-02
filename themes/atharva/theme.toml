@@ -1,0 +1,12 @@
+name = "atharva"
+license = "MIT"
+licenselink = "https://github.com/gopherine/hugo-blog/blob/main/LICENSE"
+description = "Editorial, typography-first theme for atharva.page — a writing-first library of courses and notes."
+homepage = "https://atharva.page/"
+tags = ["blog", "editorial", "minimal", "portfolio"]
+features = ["blog", "courses", "notes", "dark-mode", "series"]
+min_version = "0.140.0"
+
+[author]
+  name = "Atharva Pandey"
+  homepage = "https://atharva.page/"

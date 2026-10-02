@@ -1,0 +1,15 @@
+{{- $items := slice -}}
+{{- range where .Site.RegularPages "Section" "post" -}}
+  {{- $sec := "" -}}
+  {{- with .CurrentSection }}{{ $sec = .Title }}{{ end -}}
+  {{- $items = $items | append (dict
+      "t" (.Title | replaceRE "^Lesson \\d+: " "" | replaceRE " — .*$" "")
+      "u" .RelPermalink
+      "s" (.Params.series | default "")
+      "g" (delimit (.Params.tags | default slice) ", ")
+      "c" $sec
+      "f" (.Summary | plainify | truncate 140)
+      "d" (.PublishDate.Format "2006-01-02")
+  ) -}}
+{{- end -}}
+{{- $items | jsonify -}}

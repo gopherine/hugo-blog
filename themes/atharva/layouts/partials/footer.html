@@ -1,0 +1,15 @@
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <img class="footer-logo" src="{{ "images/layer-man.webp" | relURL }}" alt="" width="19" height="24" aria-hidden="true">
+      <span class="footer-name">{{ .Site.Title }}</span>
+      <span class="footer-copy">© {{ now.Year }}</span>
+    </div>
+    <nav class="footer-links" aria-label="Elsewhere">
+      {{ with .Site.Params.github }}<a href="https://github.com/{{ . }}" rel="me">GitHub</a>{{ end }}
+      {{ with .Site.Params.linkedin }}<a href="https://linkedin.com/in/{{ . }}" rel="me">LinkedIn</a>{{ end }}
+      {{ with .Site.Params.email }}<a href="mailto:{{ . }}">Email</a>{{ end }}
+      <a href="{{ "index.xml" | relURL }}">RSS</a>
+    </nav>
+  </div>
+</footer>

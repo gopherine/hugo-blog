@@ -1,0 +1,11 @@
+{{ $p := .p }}
+{{ $showSummary := .summary | default false }}
+{{ $title := $p.Title | replaceRE "^Lesson \\d+: " "" | replaceRE " — .*$" "" }}
+<li class="post-row">
+  <time class="post-date" datetime="{{ $p.PublishDate.Format "2006-01-02" }}">{{ $p.PublishDate.Format "Jan 2, 2006" }}</time>
+  <div>
+    <a href="{{ $p.RelPermalink }}"><h3 class="post-title">{{ $title }}</h3></a>
+    {{ if $showSummary }}<p class="post-summary">{{ $p.Summary | plainify | truncate 150 }}</p>{{ end }}
+    {{ with $p.Params.series }}<div class="post-meta"><span class="tag">{{ . }}</span></div>{{ end }}
+  </div>
+</li>

@@ -4,16 +4,10 @@
   "description": "Atharva Pandey's Hugo Blog",
   "scripts": {
     "build": "hugo --minify",
-    "build:css": "postcss assets/css/main.css -o themes/github-style/static/css/tailwind.css",
     "dev": "hugo server -D --renderToMemory"
   },
   "keywords": [],
   "author": "Atharva Pandey",
   "license": "MIT",
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.1",
-    "postcss": "^8.5.3",
-    "postcss-cli": "^11.0.0"
-  },
   "packageManager": "bun@1.4.0"
 }

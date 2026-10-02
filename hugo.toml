@@ -1,16 +1,16 @@
+baseURL='https://atharva.page/'
+languageCode='en-us'
+title='Atharva Pandey'
+copyright="Copyright ©"
+# theme imported via module.imports below
+
 [security]
 [security.funcs]
 getenv = ['^HUGO_', '^CI$', '^GITHUB_TOKEN$']
 
-baseURL='https://atharvapandey.com/'
-languageCode='en-us'
-title='Atharva Pandey'
-# theme imported via module.imports below
-copyright="Copyright ©"
-
 [module]
 [[module.imports]]
-path = "github-style"
+path = "atharva"
 [[module.imports.mounts]]
 source = "layouts"
 target = "layouts"
@@ -41,24 +41,6 @@ target = "i18n"
 [[module.mounts]]
 source = "archetypes"
 target = "archetypes"
-[[module.mounts]]
-source = "hugo_stats.json"
-target = "assets/watching/hugo_stats.json"
-
-[build]
-writeStats=true
-[[build.cachebusters]]
-source="assets/watching/hugo_stats\\.json"
-target="styles\\.css"
-[[build.cachebusters]]
-source="postcss\\.config\\.js"
-target="css"
-[[build.cachebusters]]
-source="assets/.*\\.(js|ts|jsx|tsx)"
-target="js"
-[[build.cachebusters]]
-source="assets/.*\\.(.*)$"
-target="$1"
 
 [minify]
 disableCSS=false
@@ -94,17 +76,23 @@ precision=0
 keepWhitespace=false
 
 
+[markup]
+[markup.highlight]
+noClasses = false
+lineNos = false
+
+[taxonomies]
+tag = 'tags'
+category = 'categories'
+series = 'series'
+
 [params]
 description = "Polyglot Engineer · Technical Leader. I ship AI-native tools, distributed systems, and developer platforms in Go, Rust, and TypeScript."
-
-[params.microblog]
-enabled = true
-repo = "gopherine/hugo-blog"
-author = "Gopherine"
-maxPosts = 20
-pinnedLabel = "pinned"
-thoughtsCategoryId = "DIC_kwDOLTrS184C468G"
-shippedCategoryId = "DIC_kwDOLTrS184C468N"
+github = "gopherine"
+linkedin = "atharvapandey"
+twitter = "vedaatharva"
+email = "atharvajava@gmail.com"
+monogram = "AP"
 
 [[deployment.matchers]]
 # Cache static assets for 1 year.

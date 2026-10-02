@@ -1,0 +1,17 @@
+{{ define "main" }}
+<div class="wrap">
+  <header class="page-head">
+    <h1 class="page-title">Search</h1>
+    <p class="page-lede">Search across {{ len (where .Site.RegularPages "Section" "post") }} articles, courses, and tags.</p>
+  </header>
+
+  <section class="section">
+    <label class="search-field">
+      <span class="search-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3"></path></svg></span>
+      <input id="site-search" type="search" class="search-input" placeholder="Search articles…" autocomplete="off" aria-label="Search articles" data-index='{{ "search/index.json" | relURL }}'>
+    </label>
+    <p id="search-status" class="text-faint" role="status" aria-live="polite"></p>
+    <ul id="search-results" class="post-list"></ul>
+  </section>
+</div>
+{{ end }}

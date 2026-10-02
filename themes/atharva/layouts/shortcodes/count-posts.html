@@ -1,0 +1,2 @@
+{{- /* Inline count of published articles. Usage: {{< count-posts >}} */ -}}
+{{- len (where site.RegularPages "Section" "post") -}}

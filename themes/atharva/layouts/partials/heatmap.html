@@ -1,0 +1,32 @@
+{{- $posts := where .Site.RegularPages "Section" "post" -}}
+{{- $counts := newScratch -}}
+{{- range $posts -}}
+  {{- $counts.Add (.PublishDate.Format "2006-01-02") 1 -}}
+{{- end -}}
+{{- $now := now -}}
+{{- $start := $now.AddDate 0 0 -363 -}}
+{{- $start = $start.AddDate 0 0 (mul -1 (int $start.Weekday)) -}}
+
+<div class="heatmap" role="img" aria-label="Article publishing activity over the last year">
+  {{- range $i := seq 0 52 -}}
+    {{- range $j := seq 0 6 -}}
+      {{- $date := $start.AddDate 0 0 (add (mul $i 7) $j) -}}
+      {{- if $date.After $now -}}
+        <div class="heat-cell" aria-hidden="true"></div>
+      {{- else -}}
+        {{- $c := $counts.Get ($date.Format "2006-01-02") | default 0 -}}
+        {{- $lvl := cond (eq $c 0) 0 (cond (le $c 1) 1 (cond (le $c 3) 2 (cond (le $c 5) 3 4))) -}}
+        <div class="heat-cell heat-l{{ $lvl }}" title="{{ $date.Format "Jan 2, 2006" }}: {{ $c }} post{{ if ne $c 1 }}s{{ end }}"></div>
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+</div>
+<div class="heatmap-legend" aria-hidden="true">
+  <span>Less</span>
+  <span class="heat-cell"></span>
+  <span class="heat-cell heat-l1"></span>
+  <span class="heat-cell heat-l2"></span>
+  <span class="heat-cell heat-l3"></span>
+  <span class="heat-cell heat-l4"></span>
+  <span>More</span>
+</div>

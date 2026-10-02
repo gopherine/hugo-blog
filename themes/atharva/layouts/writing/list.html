@@ -1,0 +1,68 @@
+{{ define "main" }}
+<div class="wrap">
+  <header class="page-head">
+    <h1 class="page-title">{{ .Title }}</h1>
+    <p class="page-lede">Deep, practical writing on Go, Rust, and system design — organised into courses and series. <a href="{{ "/series/" | relURL }}">Browse all courses →</a></p>
+  </header>
+
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">Publishing activity</h2></div>
+    {{ partial "heatmap.html" . }}
+  </section>
+
+  <section class="section">
+    {{ $total := len (where .Site.RegularPages "Section" "post") }}
+    <label class="search-field">
+      <span class="search-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3"></path></svg></span>
+      <input id="writing-search" type="search" class="search-input" placeholder="Search {{ $total }} articles…" aria-label="Search articles">
+    </label>
+
+    {{ with .Site.GetPage "section" "post" }}
+      {{ range .Sections }}
+      <div data-section-group>
+        <h2 class="section-heading">{{ .Title }}</h2>
+        {{ $pages := .Pages }}
+        {{ $seriesNames := slice }}
+        {{ range $pages }}{{ with .Params.series }}{{ $seriesNames = $seriesNames | append . }}{{ end }}{{ end }}
+        {{ range uniq $seriesNames }}
+          {{ $name := . }}
+          {{ $items := where $pages ".Params.series" $name }}
+          <details class="series">
+            <summary>
+              <span class="series-name">{{ $name }}</span>
+              <span class="series-count">{{ len $items }} lessons</span>
+            </summary>
+            <ul class="series-list">
+              {{ range sort $items ".Params.lesson" "asc" }}
+              <li class="series-item">
+                {{ with .Params.lesson }}<span class="series-num">{{ . }}.</span>{{ end }}
+                <a href="{{ .RelPermalink }}">{{ .Title | replaceRE "^Lesson \\d+: " "" | replaceRE " — .*$" "" }}</a>
+              </li>
+              {{ end }}
+            </ul>
+            {{ with (index $items 0).GetTerms "series" }}
+              {{ range . }}<a class="series-open" href="{{ .RelPermalink }}">Open course page →</a>{{ end }}
+            {{ end }}
+          </details>
+        {{ end }}
+
+        {{ $standalone := where $pages ".Params.series" nil }}
+        {{ with $standalone }}
+        <details class="series">
+          <summary>
+            <span class="series-name">Standalone articles</span>
+            <span class="series-count">{{ len . }} articles</span>
+          </summary>
+          <ul class="series-list">
+            {{ range .ByPublishDate.Reverse }}
+            <li class="series-item"><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+            {{ end }}
+          </ul>
+        </details>
+        {{ end }}
+      </div>
+      {{ end }}
+    {{ end }}
+  </section>
+</div>
+{{ end }}
