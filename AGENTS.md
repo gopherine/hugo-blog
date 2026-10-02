@@ -2,10 +2,10 @@
 
 ## Tooling
 
-- Use **bun** for this repo, never npm or yarn. Install with `bun install`, run scripts with `bun run <script>` (`bun run dev`, `bun run build`).
-- Hugo builds the site; bun handles the JS/CSS toolchain (Tailwind + PostCSS).
+- **Hugo** builds the site. There are no JS build deps — CSS is processed by Hugo's asset pipeline.
+- `bun` is only a convenience script runner (`bun run dev`); plain `hugo` works everywhere.
 
 ## Commands
 
-- `bun run dev` — local dev server at http://localhost:1313
-- `bun run build` — production build into `public/`
+- `bun run dev` (or `hugo server -D --renderToMemory`) — dev server at http://localhost:1313
+- `bun run build` (or `hugo --minify`) — production build into `public/`
