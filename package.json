@@ -3,20 +3,17 @@
   "version": "1.0.0",
   "description": "Atharva Pandey's Hugo Blog",
   "scripts": {
-    "build": "(tinacms build || echo 'TinaCMS build skipped') && hugo --minify",
+    "build": "hugo --minify",
     "build:css": "postcss assets/css/main.css -o themes/github-style/static/css/tailwind.css",
-    "dev": "hugo server -D"
+    "dev": "hugo server -D --renderToMemory"
   },
   "keywords": [],
   "author": "Atharva Pandey",
   "license": "MIT",
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",
-    "@tinacms/cli": "^2.1.5",
     "postcss": "^8.5.3",
     "postcss-cli": "^11.0.0"
   },
-  "dependencies": {
-    "tinacms": "^3.4.1"
-  }
+  "packageManager": "bun@1.4.0"
 }
